@@ -1,0 +1,4 @@
+#Build folder
+build/
+External/*
+!External/CMakeLists.txt
