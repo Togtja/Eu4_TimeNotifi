@@ -1,5 +1,3 @@
-
-#find_package(spdlog CONFIG REQUIRED)
 set(EXEC_NAME EU4_Notifi)
 add_executable(${EXEC_NAME})
 
@@ -21,6 +19,7 @@ target_link_libraries(
     sndfile
     OpenAL
     spdlog::spdlog
+    glad
 )
 
 target_compile_features(
