@@ -1,9 +1,10 @@
-set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
-set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-add_subdirectory(glfw-3.3.3)
+include(FetchContent)
+set(FETCHCONTENT_QUIET OFF)
 
-set(ENABLE_EXTERNAL_LIBS ON CACHE BOOL "" FORCE)
-add_subdirectory(libsndfile-1.0.31)
-
-add_subdirectory(openal-soft-1.21.1)
+# Include All Dependencies
+include(glfw.cmake)
+include(openal-soft.cmake)
+include(libsndfile.cmake)
+include(spdlog.cmake)
+# Set FC to be disconnected so we stop downloading
+set(FETCHCONTENT_FULLY_DISCONNECTED ON CACHE BOOL "This has been reset to ON (set to OFF to download again)" FORCE)

@@ -17,7 +17,7 @@ target_link_libraries(
     glfw
     sndfile
     OpenAL
-    #spdlog::spdlog
+    spdlog::spdlog
 )
 
 target_compile_features(
