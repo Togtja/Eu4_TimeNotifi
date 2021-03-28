@@ -6,6 +6,9 @@ target_sources(
     ${CMAKE_CURRENT_LIST_DIR}/imgui.h
     ${CMAKE_CURRENT_LIST_DIR}/imgui.cpp
 
+    ${CMAKE_CURRENT_LIST_DIR}/imgui_stdlib.h
+    ${CMAKE_CURRENT_LIST_DIR}/imgui_stdlib.cpp
+
     ${CMAKE_CURRENT_LIST_DIR}/imgui_demo.cpp
 
     ${CMAKE_CURRENT_LIST_DIR}/imgui_draw.cpp
