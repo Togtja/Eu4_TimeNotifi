@@ -2,14 +2,13 @@ set(EXEC_NAME EU4_Notifi)
 add_executable(${EXEC_NAME})
 
 include(${CMAKE_CURRENT_LIST_DIR}/src/CMakeLists.txt)
-
-add_subdirectory(ImGui)
+include(${CMAKE_CURRENT_LIST_DIR}/ImGui/CMakeLists.txt)
 
 target_include_directories(
     ${EXEC_NAME}
     PRIVATE
-    ${CMAKE_CURRENT_LIST_DIR}/src
     ${CMAKE_CURRENT_LIST_DIR}/include
+    ${CMAKE_CURRENT_LIST_DIR}/ImGui
 )
 target_link_libraries(
     ${EXEC_NAME}
