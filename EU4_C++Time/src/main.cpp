@@ -1,35 +1,45 @@
 // C++ Libraries
+#include <iostream>
+#include <string>
+#include <thread>
+#include <unordered_map>
+#include <vector>
 
 // External Libraries
 #include <glad/glad.h>
-#include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
+#include <imgui_internal.h>
+#include <imgui_stdlib.h>
 #include <spdlog/spdlog.h>
+
 // Need to include glfe3 after glad + imgui
 #include <GLFW/glfw3.h>
 
 // Own Libaries
+#include "CrossMemory.hpp"
+#include "Eu4Date.hpp"
 
 static void glfw_error_callback(int error, const char* description) {
     spdlog::log(spdlog::level::critical, "GLFW Error {}: {}", error, description);
 }
 
-int main(int, char**) {
+int main(int argc, char* argv[]) {
     // Setup window
     glfwSetErrorCallback(glfw_error_callback);
     if (!glfwInit())
         return 1;
 
     // GL 3.0 + GLSL 130
-    const char* glsl_version = "#version 130";
+    const std::string glsl_version = "#version 130";
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // 3.0+ only
     // glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);  // 3.2+ only
 
     // Create window with graphics context
-    GLFWwindow* window = glfwCreateWindow(1280, 720, "EU4 Time notification", NULL, NULL);
+    ImVec2 window_size{700, 700};
+    GLFWwindow* window = glfwCreateWindow(window_size.x, window_size.y, "EU4 Time notification", NULL, NULL);
     if (window == NULL)
         return 1;
     glfwMakeContextCurrent(window);
@@ -37,7 +47,7 @@ int main(int, char**) {
 
     bool err = gladLoadGL() == 0;
     if (err) {
-        fprintf(stderr, "Failed to initialize OpenGL loader!\n");
+        spdlog::log(spdlog::level::critical, "Failed to initialize OpenGL loader!");
         return 1;
     }
 
@@ -45,9 +55,7 @@ int main(int, char**) {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
-    (void)io;
-    // io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-    // io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
 
     // Setup Dear ImGui style
     ImGui::StyleColorsDark();
@@ -55,20 +63,36 @@ int main(int, char**) {
 
     // Setup Platform/Renderer backends
     ImGui_ImplGlfw_InitForOpenGL(window, true);
-    ImGui_ImplOpenGL3_Init(glsl_version);
+    ImGui_ImplOpenGL3_Init(glsl_version.c_str());
 
     // Our state
-    bool show_demo_window    = true;
-    bool show_another_window = false;
-    ImVec4 clear_color       = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+    bool show_demo_window                     = true;
+    ImVec4 clear_color                        = ImVec4(0.65f, 0.55f, 0.60f, 1.00f);
+    const std::vector<std::string> month_name = {"1:January",
+                                                 "2:February",
+                                                 "3:March",
+                                                 "4:April",
+                                                 "5:May",
+                                                 "6:June",
+                                                 "7:July",
+                                                 "8:August",
+                                                 "9:September",
+                                                 "10:October",
+                                                 "11:November",
+                                                 "12:December"};
+    std::string current_month{"11:November"};
+    bool foundEu4Memloc = false;
+    bool increase_day   = false;
+
+    CrossMemory* mem = nullptr;
+
+    std::unordered_map<uint8_t, uint32_t> eu4_date_address{};
+
+    std::thread worker_thread;
+    bool running = false;
 
     // Main loop
     while (!glfwWindowShouldClose(window)) {
-        // Poll and handle events (inputs, window resize, etc.)
-        // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your inputs.
-        // - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application.
-        // - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application.
-        // Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
         glfwPollEvents();
 
         // Start the Dear ImGui frame
@@ -76,43 +100,124 @@ int main(int, char**) {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn
-        // more about Dear ImGui!).
-        if (show_demo_window)
-            ImGui::ShowDemoWindow(&show_demo_window);
-
         // 2. Show a simple window that we create ourselves. We use a Begin/End pair to created a named window.
         {
             static float f     = 0.0f;
             static int counter = 0;
+            ImGui::SetNextWindowPos({0, 0});
+            ImGui::SetNextWindowSize(window_size);
+            ImGui::Begin("Hello, world!",
+                         0,
+                         ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoFocusOnAppearing |
+                             ImGuiWindowFlags_NoBackground |
+                             ImGuiWindowFlags_NoDecoration); // Create a window called "Hello, world!" and append into it.
+            static int day{11}, month{11}, year{1444};
+            int c_day{11}, c_month{11}, c_year{1444};
+            // Find the eu4 Date:
+            if (!foundEu4Memloc) {
+                static std::string eu4exe{"eu4.exe"};
+                if (!increase_day) {
+                    ImGui::Text("Eu4 excecutable name (typically eu4.exe):");
+                    ImGui::InputText("##eu4 exe", &eu4exe);
+                    ImGui::Text("Enter the current EU4 Date:"); // Display some text (you can use a format strings too)
+                }
+                else {
+                    ImGui::Text("Enter a different EU4 Date:");
+                }
+                const std::string eu4_insert_date_txt = "##eu4 date";
+                ImGui::PushItemWidth(100);
+                ImGui::InputInt("##eu4 day", &day);
+                ImGui::SameLine();
+                if (ImGui::BeginCombo("##eu4 month", current_month.c_str(), 0)) {
+                    for (int i = 0; i < month_name.size(); i++) {
+                        bool is_selected = (month == i + 1);
+                        if (ImGui::Selectable(month_name[i].c_str(), is_selected)) {
+                            current_month = month_name[i];
+                            month         = i - 1;
+                        }
+                        if (is_selected) {
+                            ImGui::SetItemDefaultFocus();
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+                ImGui::SameLine();
+                ImGui::InputInt("##eu4 year", &year);
+                if (running) {
+                    ImGui::Text("Working on finding the date in the game");
+                }
+                if (!running && ImGui::Button("Submit", {200, 20})) {
+                    if (worker_thread.joinable()) {
+                        worker_thread.join();
+                    }
+                    worker_thread = std::thread([&mem, &running, &eu4_date_address, &foundEu4Memloc, &increase_day]() {
+                        running = true;
+                        Eu4Date eu4date(day, month, year);
+                        if (!mem) {
+                            try {
+                                mem = new CrossMemory(eu4exe);
+                            }
+                            catch (const std::exception& e) {
+                                if (mem) {
+                                    delete mem;
+                                    mem = nullptr;
+                                }
+                                std::cout << e.what() << '\n';
+                            }
+                        }
+                        if (!eu4_date_address.empty()) {
+                            mem->find_byte_from_map(eu4date.get_days(), eu4_date_address);
+                        }
+                        else {
+                            eu4_date_address = mem->find_byte(eu4date.get_days());
+                        }
+                        std::cout << "return size:" << eu4_date_address.size();
+                        if (eu4_date_address.size() == 1) {
+                            foundEu4Memloc = true;
+                        }
+                        else {
+                            increase_day = true;
+                        }
 
-            ImGui::Begin("Hello, world!"); // Create a window called "Hello, world!" and append into it.
+                        running = false;
+                    });
+                }
+                c_day   = day;
+                c_month = month;
+                c_year  = year;
+            }
+            else {
+                uint32_t eu4_date_read{};
+                mem->bytes_to_T(eu4_date_address.begin()->first, eu4_date_read);
+                Eu4Date cur_date(eu4_date_read);
+                const auto& [_day, _month, _year] = cur_date.get_date();
+                c_day                             = _day;
+                c_month                           = _month;
+                c_year                            = _year;
+                // TODO: set c_day from day etc...
+            }
 
-            ImGui::Text("This is some useful text.");          // Display some text (you can use a format strings too)
-            ImGui::Checkbox("Demo Window", &show_demo_window); // Edit bools storing our window open/close state
-            ImGui::Checkbox("Another Window", &show_another_window);
-
-            ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
-            ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
-
-            if (ImGui::Button("Button")) // Buttons return true when clicked (most widgets return true when edited/activated)
-                counter++;
+            // Displays the current date
+            // If anyone read this help me not use readonly inout and a fake combo list, but keep the theme from the input
+            ImGui::Text("Current Eu4 Date"); // Display some text (you can use a format strings too)
+            ImGui::PushItemWidth(100);
+            // ImGui::Text(fmt::format("{}", c_day).c_str());
+            ImGui::InputInt("##eu4 current day", &c_day, 0, ImGuiInputTextFlags_ReadOnly);
             ImGui::SameLine();
-            ImGui::Text("counter = %d", counter);
+            if (ImGui::BeginCombo("##eu4 current month", current_month.c_str(), ImGuiComboFlags_NoArrowButton)) {
+                for (int i = 0; i < month_name.size(); i++) {
+                    if (c_month == i + 1) {
+                        ImGui::SetItemDefaultFocus();
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            ImGui::SameLine();
+            ImGui::InputInt("##eu4 current year", &c_year, 0, ImGuiInputTextFlags_ReadOnly);
 
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
                         1000.0f / ImGui::GetIO().Framerate,
                         ImGui::GetIO().Framerate);
-            ImGui::End();
-        }
-
-        // 3. Show another simple window.
-        if (show_another_window) {
-            ImGui::Begin("Another Window", &show_another_window); // Pass a pointer to our bool variable (the window will have a
-                                                                  // closing button that will clear the bool when clicked)
-            ImGui::Text("Hello from another window!");
-            if (ImGui::Button("Close Me"))
-                show_another_window = false;
             ImGui::End();
         }
 
@@ -132,6 +237,9 @@ int main(int, char**) {
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
+    if (mem) {
+        delete mem;
+    }
 
     glfwDestroyWindow(window);
     glfwTerminate();
