@@ -1,9 +1,14 @@
-#include <vector>
-#include <string>
 #include <sstream>
+#include <string>
+#include <vector>
 
-class Eu4Date
-{
+struct Eu4DateStruct {
+    uint8_t day{};
+    uint8_t month{};
+    uint16_t year{};
+};
+
+class Eu4Date {
 private:
     const std::vector<uint16_t> months_days = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
     uint32_t m_days{};
@@ -23,5 +28,5 @@ public:
     std::string get_date_as_string();
 
     uint32_t get_days() { return m_days; }
+    Eu4DateStruct get_date() { return {m_day, m_month, m_year}; }
 };
-
