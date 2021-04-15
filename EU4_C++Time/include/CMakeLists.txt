@@ -3,5 +3,7 @@ target_sources(
     PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/Eu4Date.hpp
     ${CMAKE_CURRENT_LIST_DIR}/WindowsMem.hpp
+    ${CMAKE_CURRENT_LIST_DIR}/UnixMem.hpp
+    ${CMAKE_CURRENT_LIST_DIR}/CrossMemory.hpp
     ${CMAKE_CURRENT_LIST_DIR}/NotificationSound.hpp
 )
