@@ -1,4 +1,5 @@
 // C++ Libraries
+#include <algorithm>
 #include <iostream>
 #include <string>
 #include <thread>
@@ -19,6 +20,7 @@
 // Own Libaries
 #include "CrossMemory.hpp"
 #include "Eu4Date.hpp"
+#include "NotificationSound.hpp"
 
 static void glfw_error_callback(int error, const char* description) {
     spdlog::log(spdlog::level::critical, "GLFW Error {}: {}", error, description);
@@ -44,6 +46,8 @@ int main(int argc, char* argv[]) {
         return 1;
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1); // Enable vsync
+
+    NotificationSound sound("Resources/Audio/quest_complete.wav");
 
     bool err = gladLoadGL() == 0;
     if (err) {
@@ -86,7 +90,8 @@ int main(int argc, char* argv[]) {
 
     CrossMemory* mem = nullptr;
 
-    std::unordered_map<uint8_t, uint32_t> eu4_date_address{};
+    std::vector<uint8_t*> eu4_date_address{};
+    std::vector<Eu4Date> notify_dates{};
 
     std::thread worker_thread;
     bool running = false;
@@ -133,7 +138,7 @@ int main(int argc, char* argv[]) {
                         bool is_selected = (month == i + 1);
                         if (ImGui::Selectable(month_name[i].c_str(), is_selected)) {
                             current_month = month_name[i];
-                            month         = i - 1;
+                            month         = i + 1;
                         }
                         if (is_selected) {
                             ImGui::SetItemDefaultFocus();
@@ -150,6 +155,12 @@ int main(int argc, char* argv[]) {
                     if (worker_thread.joinable()) {
                         worker_thread.join();
                     }
+                    // Eu4Date eu4date(day, month, year);
+                    // Eu4Date eu4loop(eu4date.get_days());
+                    // auto datet = eu4loop.get_date();
+                    // Eu4Date eu4loop2(datet.day, datet.month, datet.year);
+                    // std::cout << "eu4 loop: " << eu4loop.get_date_as_string() << " days: " << eu4loop2.get_days() << "\n";
+
                     worker_thread = std::thread([&mem, &running, &eu4_date_address, &foundEu4Memloc, &increase_day]() {
                         running = true;
                         Eu4Date eu4date(day, month, year);
@@ -166,10 +177,10 @@ int main(int argc, char* argv[]) {
                             }
                         }
                         if (!eu4_date_address.empty()) {
-                            mem->find_byte_from_map(eu4date.get_days(), eu4_date_address);
+                            eu4_date_address = mem->find_byte_from_vector(eu4date.get_days(), eu4_date_address);
                         }
                         else {
-                            eu4_date_address = mem->find_byte(eu4date.get_days());
+                            eu4_date_address = mem->find_value(eu4date.get_days());
                         }
                         std::cout << "return size:" << eu4_date_address.size();
                         if (eu4_date_address.size() == 1) {
@@ -188,17 +199,19 @@ int main(int argc, char* argv[]) {
             }
             else {
                 uint32_t eu4_date_read{};
-                mem->bytes_to_T(eu4_date_address.begin()->first, eu4_date_read);
+                mem->bytes_to_T2(eu4_date_address.front(), eu4_date_read);
                 Eu4Date cur_date(eu4_date_read);
                 const auto& [_day, _month, _year] = cur_date.get_date();
                 c_day                             = _day;
                 c_month                           = _month;
+                current_month                     = month_name[_month - 1];
                 c_year                            = _year;
                 // TODO: set c_day from day etc...
             }
 
             // Displays the current date
             // If anyone read this help me not use readonly inout and a fake combo list, but keep the theme from the input
+
             ImGui::Text("Current Eu4 Date"); // Display some text (you can use a format strings too)
             ImGui::PushItemWidth(100);
             // ImGui::Text(fmt::format("{}", c_day).c_str());
@@ -215,6 +228,48 @@ int main(int argc, char* argv[]) {
             ImGui::SameLine();
             ImGui::InputInt("##eu4 current year", &c_year, 0, ImGuiInputTextFlags_ReadOnly);
 
+            if (foundEu4Memloc) {
+                static int n_day{11}, n_month{11}, n_year{1444};
+                Eu4Date currDate(c_day, c_month, c_year);
+                Eu4Date notiDate(n_day, n_month, n_year);
+                if (notiDate.get_days() < currDate.get_days()) {
+                    n_day   = c_day;
+                    n_month = c_month;
+                    n_year  = c_year;
+                }
+                ImGui::Text("Add a notification for a specific date"); // Display some text (you can use a format strings too)
+                ImGui::PushItemWidth(100);
+                // ImGui::Text(fmt::format("{}", c_day).c_str());
+                ImGui::InputInt("##eu4 notification day", &n_day, 1);
+                ImGui::SameLine();
+                if (ImGui::BeginCombo("##eu4 notification month", month_name[n_month - 1].c_str())) {
+                    for (int i = 0; i < month_name.size(); i++) {
+                        bool is_selected = (n_month == i + 1);
+                        if (ImGui::Selectable(month_name[i].c_str(), is_selected)) {
+                            n_month = i + 1;
+                        }
+                        if (is_selected) {
+                            ImGui::SetItemDefaultFocus();
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+                ImGui::SameLine();
+                ImGui::InputInt("##eu4 notification year", &n_year, 1);
+                if (ImGui::Button("Submit", {200, 20})) {
+                    notify_dates.push_back(Eu4Date(n_day, n_month, n_year));
+                }
+            }
+            if (!notify_dates.empty()) {
+                auto notify_dates_cpy = notify_dates;
+                for (auto eu4date : notify_dates_cpy) {
+                    Eu4Date currDate(c_day, c_month, c_year);
+                    if (eu4date.get_days() <= currDate.get_days()) {
+                        sound.play();
+                        notify_dates.erase(std::remove(notify_dates.begin(), notify_dates.end(), eu4date), notify_dates.end());
+                    }
+                }
+            }
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
                         1000.0f / ImGui::GetIO().Framerate,
                         ImGui::GetIO().Framerate);
