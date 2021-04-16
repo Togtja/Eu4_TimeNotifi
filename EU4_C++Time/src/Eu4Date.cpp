@@ -7,7 +7,7 @@ Eu4Date::Eu4Date(uint32_t days) {
     days -= m_year * 365;
 
     uint8_t month{0};
-    for (; month < months_days.size() && days > months_days[month]; month++) {
+    for (; month < months_days.size() && days >= months_days[month]; month++) {
         days -= months_days[month];
     }
     month++; // Add 1 month as it stats on 0
