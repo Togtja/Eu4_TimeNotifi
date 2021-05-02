@@ -6,4 +6,5 @@ target_sources(
     ${CMAKE_CURRENT_LIST_DIR}/UnixMem.hpp
     ${CMAKE_CURRENT_LIST_DIR}/CrossMemory.hpp
     ${CMAKE_CURRENT_LIST_DIR}/NotificationSound.hpp
+    ${CMAKE_CURRENT_LIST_DIR}/DllInjector.hpp
 )
