@@ -5,3 +5,4 @@ find_package(OpenGL REQUIRED)
 
 add_subdirectory(External)
 add_subdirectory(EU4_C++Time)
+add_subdirectory(EU4_C++Time/test)

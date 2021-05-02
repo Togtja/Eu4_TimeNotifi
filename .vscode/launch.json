@@ -13,6 +13,16 @@
             "stopAtEntry": false,
             "environment": [],
             "console":"externalTerminal"
+        },
+        {
+            "name": "External_eu4",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/${command:cmake.buildKit}/${command:cmake.buildType}/EU4_C++Time/test/External_eu4.exe",
+            "cwd": "${workspaceRoot}",
+            "stopAtEntry": false,
+            "environment": [],
+            "console":"externalTerminal"
         }
     ]
 }
