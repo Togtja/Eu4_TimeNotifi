@@ -17,48 +17,23 @@ private:
 #endif
 public:
     template<class T>
-    std::unordered_map<uint8_t*, T> find_byte(T find) {
-        std::cout << "looking for: " << find << "\n";
-        return mem->find_byte(find);
-    }
-
-    template<class T>
-    std::vector<const uint8_t*> find_value(T find) {
-        std::cout << "looking for: " << find << "\n";
-        return mem->find_value(find);
-    }
-
-    template<class T>
-    std::vector<void*> find_value2(T find) {
-        std::cout << "looking for: " << find << "\n";
-        return mem->find_value2(find);
-    }
-
-    template<class T>
     std::vector<const uint8_t*> scan_memory(T find) {
         std::cout << "looking for: " << find << "\n";
         return mem->scan_memory(find);
     }
 
     template<typename T>
-    void bytes_to_T(uint8_t addr, T& val) {
+    void bytes_to_T(const uint8_t* addr, T& val) {
         return mem->bytes_to_T(addr, val);
-    }
-
-    template<typename T>
-    void bytes_to_T2(const uint8_t* addr, T& val) {
-        return mem->bytes_to_T2(addr, val);
-    }
-
-    template<class T>
-    std::unordered_map<uint8_t, T> find_byte_from_map(T find, const std::unordered_map<uint8_t, T>& map) {
-        return mem->find_byte_from_map(find, map);
     }
 
     template<class T>
     std::vector<const uint8_t*> find_byte_from_vector(T find, const std::vector<const uint8_t*>& vector) {
         return mem->find_byte_from_vector(find, vector);
     }
+
+    // void scan_inject(int find, bool new_run) { return mem->scan_inject(find, new_run); }
+
     CrossMemory(const std::string& exec_name);
     ~CrossMemory();
 };
