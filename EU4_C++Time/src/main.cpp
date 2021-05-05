@@ -191,18 +191,18 @@ int main(int argc, char* argv[]) {
                                 std::cout << e.what() << '\n';
                             }
                         }
-                        if (!eu4_date_address.empty()) {
+                        if (mem && !eu4_date_address.empty()) {
                             eu4_date_address = mem->find_byte_from_vector(eu4date.get_days(), eu4_date_address);
                         }
-                        else {
+                        else if (mem) {
                             std::cout << "Using find_value:\n";
                             eu4_date_address = mem->scan_memory(eu4date.get_days());
                         }
                         std::cout << "return size:" << eu4_date_address.size();
-                        if (eu4_date_address.size() == 1) {
+                        if (mem && eu4_date_address.size() == 1) {
                             foundEu4Memloc = true;
                         }
-                        else {
+                        else if (mem) {
                             increase_day = true;
                         }
 
