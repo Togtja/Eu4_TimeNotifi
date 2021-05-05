@@ -5,4 +5,5 @@ target_sources(
         ${CMAKE_CURRENT_LIST_DIR}/DllInjector.cpp
         ${CMAKE_CURRENT_LIST_DIR}/Eu4Date.cpp
         ${CMAKE_CURRENT_LIST_DIR}/NotificationSound.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/WindowsMem.cpp
 )
