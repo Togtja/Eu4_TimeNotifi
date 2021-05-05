@@ -25,6 +25,21 @@
 static void glfw_error_callback(int error, const char* description) {
     spdlog::log(spdlog::level::critical, "GLFW Error {}: {}", error, description);
 }
+/**
+int main() {
+    // CrossMemory mem("eu4.exe");
+    DllInjector dll_inject(dll_path, "external_eu4.exe");
+    spdlog::log(spdlog::level::info, "Enter a key to inject");
+    int find;
+    std::cin >> find;
+    dll_inject.inject(find, true);
+    while (true) {
+        int find;
+        std::cin >> find;
+        dll_inject.inject(find, false);
+    }
+}
+*/
 
 int main(int argc, char* argv[]) {
     // Setup window
@@ -90,7 +105,7 @@ int main(int argc, char* argv[]) {
 
     CrossMemory* mem = nullptr;
 
-    std::vector<uint8_t*> eu4_date_address{};
+    std::vector<const uint8_t*> eu4_date_address{};
     std::vector<Eu4Date> notify_dates{};
 
     std::thread worker_thread;
@@ -180,7 +195,8 @@ int main(int argc, char* argv[]) {
                             eu4_date_address = mem->find_byte_from_vector(eu4date.get_days(), eu4_date_address);
                         }
                         else {
-                            eu4_date_address = mem->find_value(eu4date.get_days());
+                            std::cout << "Using find_value:\n";
+                            eu4_date_address = mem->scan_memory(eu4date.get_days());
                         }
                         std::cout << "return size:" << eu4_date_address.size();
                         if (eu4_date_address.size() == 1) {
@@ -199,7 +215,7 @@ int main(int argc, char* argv[]) {
             }
             else {
                 uint32_t eu4_date_read{};
-                mem->bytes_to_T2(eu4_date_address.front(), eu4_date_read);
+                mem->bytes_to_T(eu4_date_address.front(), eu4_date_read);
                 Eu4Date cur_date(eu4_date_read);
                 const auto& [_day, _month, _year] = cur_date.get_date();
                 c_day                             = _day;
@@ -298,131 +314,8 @@ int main(int argc, char* argv[]) {
 
     glfwDestroyWindow(window);
     glfwTerminate();
-
+    if (worker_thread.joinable()) {
+        worker_thread.join();
+    }
     return 0;
 }
-
-/*
-//standard C++
-#include <algorithm>
-#include <filesystem>
-#include <fstream>
-#include <iostream>
-#include <string>
-#include <type_traits>
-#include <unordered_map>
-#include <vector>
-
-//External Libraries
-#include <GLFW/glfw3.h>
-#include <imgui.h>
-
-#include <Eu4Date.hpp>
-#include <NotificationSound.hpp>
-#include <WindowsMem.hpp>
-
-
-int main() {
-    NotificationSound sound("Resources/Audio/quest_complete.wav");
-    sound.play();
-
-
-    GLFWwindow* window;
-
-    //Initialize the library
-    if (!glfwInit())
-        return -1;
-
-    // Create a windowed mode window and its OpenGL context
-    window = glfwCreateWindow(640, 480, "Hello World", NULL, NULL);
-    if (!window)
-    {
-        glfwTerminate();
-        return -1;
-    }
-
-    // Make the window's context current
-    glfwMakeContextCurrent(window);
-
-    //ImGUI stuff
-
-    // Loop until the user closes the window
-    while (!glfwWindowShouldClose(window))
-    {
-        // Render here
-        glClear(GL_COLOR_BUFFER_BIT);
-
-        // Swap front and back buffers
-        glfwSwapBuffers(window);
-
-        // Poll for and process events
-        glfwPollEvents();
-    }
-
-    glfwTerminate();
-    return 0;
-    /**
-    DWORD access = PROCESS_VM_READ | PROCESS_QUERY_INFORMATION;
-    HANDLE proc  = getProcessByName("EU4.exe", access);
-    if (proc == NULL) {
-        std::cout << "failed to get process";
-        return 0;
-    }
-    if (std::filesystem::exists("addresses.txt")) {
-        std::ifstream file("addresses.txt", std::ios::in);
-        std::string line;
-        std::getline(file, line);
-    }
-
-    uint32_t num;
-    std::string cmd;
-    std::cout << "value to find\n";
-    std::cin >> num;
-    std::cin.get();
-
-    auto mapping = find_byte(proc, num);
-    std::cout << "found " << mapping.size() << " results\n";
-    std::cout << "display [y/n]\n";
-    std::getline(std::cin, cmd);
-    while (cmd == "y") {
-        for (const auto [k, v] : mapping) {
-            auto bytes = readAddress(proc, k, sizeof(v));
-            std::cout << std::string(bytes.begin(), bytes.end()) << "\n";
-        }
-        std::cout << "display [y/n]\n";
-        std::getline(std::cin, cmd);
-    }
-    while (mapping.size() > 1) {
-        std::cout << "Update number to be: ";
-        std::cin >> num;
-        std::cin.get();
-        mapping = find_byte_from_map(proc, num, mapping);
-        std::cout << "found " << mapping.size() << " results\n";
-        std::cout << "display [y/n]\n";
-        std::getline(std::cin, cmd);
-        while (cmd == "y") {
-            for (const auto [k, v] : mapping) {
-                if constexpr(std::is_same_v<decltype(v), std::string>){
-
-                }
-                auto cpy = v;
-                bytesToT(proc, k, cpy);
-                std::cout << v << "vs" << cpy << "\n";
-            }
-            std::cout << "display [y/n]\n";
-            std::getline(std::cin, cmd);
-        }
-    }
-    if (mapping.size() > 0) {
-        std::ofstream file("addresses.txt", std::ios::out);
-        for (const auto [k, v] : mapping) {
-            file << k << ":" << sizeof(v);
-        }
-        file.close();
-    }
-    CloseHandle(proc);
-
-    std::cout << "The end";
-    std::cin >> num;
-}
-    */
