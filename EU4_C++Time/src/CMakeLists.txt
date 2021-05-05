@@ -2,6 +2,7 @@ target_sources(
         ${EXEC_NAME}
         PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}/main.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/DllInjector.cpp
         ${CMAKE_CURRENT_LIST_DIR}/Eu4Date.cpp
         ${CMAKE_CURRENT_LIST_DIR}/NotificationSound.cpp
 )
