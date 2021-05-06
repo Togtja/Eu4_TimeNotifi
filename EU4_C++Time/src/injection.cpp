@@ -3,18 +3,15 @@
 #include <psapi.h>
 
 #include <algorithm>
-#include <future>
+#include <chrono>
 #include <iostream>
-#include <mutex>
 #include <string>
-#include <thread>
-#include <unordered_map>
 #include <vector>
 
 std::vector<uint8_t> read_address(const uint8_t* address, size_t size) {
     std::vector<uint8_t> mem_chunk;
     mem_chunk.resize(size);
-    size_t read;
+    SIZE_T read;
     if (ReadProcessMemory(GetCurrentProcess(), address, mem_chunk.data(), mem_chunk.size(), &read)) {
         return mem_chunk;
     }
@@ -39,112 +36,145 @@ std::vector<const void*> scan_memory(std::vector<const void*> addresses, const s
 
     MEMORY_BASIC_INFORMATION mbi{};
     for (auto&& address : addresses) {
-        std::vector<uint8_t> mem_chunk;
-        mem_chunk.resize(bytes_to_find.size());
-        size_t read;
-        if (ReadProcessMemory(GetCurrentProcess(), address, mem_chunk.data(), mem_chunk.size(), &read)) {
-            if (mem_chunk == bytes_to_find) {
-                addresses_found.push_back(address);
+        int cool;
+        bytes_to_int((const uint8_t*)address, cool);
+        std::cout << "Address: " << std::hex << address << " has value: " << std::dec << cool << "\n";
+    }
+
+    return addresses;
+    /**
+
+     */
+}
+
+std::vector<const void*> scan_memory(void* address_low, void* address_max, const std::vector<uint8_t>& bytes_to_find) {
+    std::vector<const void*> addresses_found;
+
+    // all readable pages: adjust this as required
+    const DWORD pmask = PAGE_READONLY | PAGE_READWRITE;
+
+    MEMORY_BASIC_INFORMATION mbi{};
+
+    uint8_t* address = static_cast<uint8_t*>(address_low);
+
+    while (address < address_max && VirtualQuery(address, std::addressof(mbi), sizeof(mbi))) {
+        if ((mbi.State == MEM_COMMIT) && (mbi.Protect & pmask) && !(mbi.Protect & PAGE_GUARD)) {
+            const uint8_t* begin = static_cast<const BYTE*>(mbi.BaseAddress);
+            const uint8_t* end   = begin + mbi.RegionSize;
+
+            const uint8_t* found = std::search(begin, end, bytes_to_find.begin(), bytes_to_find.end());
+            while (found != end) {
+                addresses_found.push_back(found);
+                found = std::search(found + 1, end, bytes_to_find.begin(), bytes_to_find.end());
             }
         }
+
+        address += mbi.RegionSize;
+        mbi = {};
+    }
+
+    return addresses_found;
+}
+
+std::vector<const void*> scan_memory2(void* address_low, const std::vector<uint8_t>& bytes_to_find) {
+    std::vector<const void*> addresses_found;
+
+    // all readable pages: adjust this as required
+    const DWORD pmask = PAGE_READONLY | PAGE_READWRITE;
+
+    MEMORY_BASIC_INFORMATION mbi{};
+
+    uint8_t* address = static_cast<uint8_t*>(address_low);
+
+    while (VirtualQuery(address, std::addressof(mbi), sizeof(mbi))) {
+        if ((mbi.State == MEM_COMMIT) && (mbi.Protect & pmask) && !(mbi.Protect & PAGE_GUARD)) {
+            std::vector<uint8_t> mem_chunk;
+            mem_chunk.reserve(mbi.RegionSize);
+            SIZE_T read{};
+            if (ReadProcessMemory(GetCurrentProcess(), mbi.BaseAddress, mem_chunk.data(), mbi.RegionSize, &read)) {
+                auto start = mem_chunk.data(), end = start + read, pos = start;
+                if (address > mbi.BaseAddress) {
+                    pos += (address - static_cast<uint8_t*>(mbi.BaseAddress));
+                }
+                while ((pos = std::search(pos, end, bytes_to_find.begin(), bytes_to_find.end())) != end) {
+                    addresses_found.emplace_back(static_cast<uint8_t*>(mbi.BaseAddress) + (pos - start));
+                    pos += bytes_to_find.size();
+                }
+            }
+        }
+
+        address += mbi.RegionSize;
+        mbi = {};
     }
 
     return addresses_found;
 }
 
 std::vector<const void*> scan_memory(const std::vector<uint8_t>& bytes_to_find) {
-    uint8_t *addr = nullptr, *base;
-    MEMORY_BASIC_INFORMATION info;
-    // all readable pages: adjust this as required
-    const DWORD pmask = PAGE_READONLY | PAGE_READWRITE;
+    DWORD_PTR baseAddress = 0;
+    DWORD_PTR maxAddress  = 0;
+    DWORD bytesRequired;
+    HANDLE processHandle = GetCurrentProcess();
+    if (EnumProcessModules(processHandle, NULL, 0, &bytesRequired)) {
+        if (bytesRequired) {
+            LPBYTE moduleArrayBytes = (LPBYTE)LocalAlloc(LPTR, bytesRequired);
 
-    const int max_threads = std::thread::hardware_concurrency();
-    std::vector<std::thread> worker;
-    std::vector<std::future<std::vector<uint8_t*>>> worker_future;
-    std::unordered_map<std::thread::id, bool> working_thread;
+            if (moduleArrayBytes) {
+                unsigned int moduleCount;
 
-    std::mutex mutex;
-    std::mutex working_mutex;
+                moduleCount          = bytesRequired / sizeof(HMODULE);
+                HMODULE* moduleArray = (HMODULE*)moduleArrayBytes;
 
-    std::vector<uint8_t*> found;
-    auto start  = std::chrono::steady_clock::now();
-    auto m_proc = GetCurrentProcess();
-    while (VirtualQuery(addr, &info, sizeof(info))) {
-        // TODO: Multi thread this
-        base = static_cast<uint8_t*>(info.BaseAddress);
-        if (worker.size() < max_threads) {
-            if (info.State == MEM_COMMIT && (info.Type == MEM_MAPPED || info.Type == MEM_PRIVATE) && (info.Protect & pmask) &&
-                !(info.Protect & PAGE_GUARD)) {
-                auto info_copy = info;
-                std::promise<std::vector<uint8_t*>> p;
-                worker_future.push_back(p.get_future());
-                worker.push_back(std::thread(
-                    [&, proc = m_proc, info, bytes_to_find, working_thread, addr](
-                        std::promise<std::vector<uint8_t*>>&& p) mutable {
-                        {
-                            std::lock_guard<std::mutex> guard(working_mutex);
-                            working_thread[std::this_thread::get_id()] = true;
-                        }
-                        std::vector<uint8_t*> found;
-                        std::vector<uint8_t> mem_chunk;
-                        mem_chunk.reserve(info.RegionSize);
-                        size_t read;
-                        if (ReadProcessMemory(proc, info.BaseAddress, mem_chunk.data(), info.RegionSize, &read)) {
-                            auto start = mem_chunk.data(), end = start + read, pos = start;
-                            if (addr > info.BaseAddress) {
-                                pos += (addr - info.BaseAddress);
-                            }
-                            while ((pos = std::search(pos, end, bytes_to_find.begin(), bytes_to_find.end())) != end) {
-                                found.emplace_back(static_cast<uint8_t*>(info.BaseAddress) + (pos - start));
-                                pos += bytes_to_find.size();
-                            }
-                        }
-                        p.set_value(found);
-
-                        {
-                            std::lock_guard<std::mutex> guard(working_mutex);
-                            working_thread[std::this_thread::get_id()] = false;
-                        }
-                    },
-                    std::move(p)));
-            }
-        }
-        while (worker.size() >= max_threads) {
-            for (int i = 0; i < worker.size();) {
-                if (!working_thread[worker[i].get_id()] && worker[i].joinable()) {
-                    worker[i].join();
-                    auto work = worker_future[i].get();
-                    if (!work.empty()) {
-                        found.reserve(found.size() + work.size());
-                        found.insert(found.end(), work.begin(), work.end());
+                if (EnumProcessModules(processHandle, moduleArray, bytesRequired, &bytesRequired)) {
+                    MODULEINFO minfo{};
+                    GetModuleInformation(processHandle, moduleArray[moduleCount - 1], &minfo, sizeof(minfo));
+                    baseAddress = (DWORD_PTR)moduleArray[0];
+                    maxAddress  = (DWORD_PTR)moduleArray[moduleCount - 1] + minfo.SizeOfImage;
+                    for (int i = 0; i < moduleCount; i++) {
+                        GetModuleInformation(processHandle, moduleArray[i], &minfo, sizeof(minfo));
+                        std::cout << "Module " << i << "Address: " << std::hex << (void*)moduleArray[i] << "\n" << std::dec;
                     }
-                    worker.erase(worker.begin() + i);
-                    worker_future.erase(worker_future.begin() + i);
                 }
-                else {
-                    i++;
-                }
+
+                LocalFree(moduleArrayBytes);
             }
-        };
-
-        addr = base + info.RegionSize;
-    }
-
-    for (auto&& i : worker) {
-        if (i.joinable()) {
-            i.join();
         }
     }
-    worker.clear();
-    std::vector<const void*> out;
-    for (auto&& i : found) {
-        out.emplace_back(i);
-    }
 
-    auto end = std::chrono::steady_clock::now();
-    std::cout << "Spend " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms to find value\n";
+    std::cout << "MINAddress: " << std::hex << (void*)baseAddress << "\n";
 
-    return out;
+    std::cout << "MAXAddress: " << std::hex << (void*)maxAddress << "\n" << std::dec;
+
+    auto start_timer = std::chrono::steady_clock::now();
+    auto out         = scan_memory((void*)baseAddress, (void*)maxAddress, bytes_to_find);
+    auto end         = std::chrono::steady_clock::now();
+    std::cout << "Spendt (scan_memory) " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start_timer).count()
+              << "ms to find value\n";
+
+    start_timer = std::chrono::steady_clock::now();
+    auto out2   = scan_memory2((void*)baseAddress, bytes_to_find);
+    end         = std::chrono::steady_clock::now();
+    std::cout << "Spendt (scan_memory2) " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start_timer).count()
+              << "ms to find value\n";
+
+    start_timer = std::chrono::steady_clock::now();
+    auto out3   = scan_memory(nullptr, (void*)baseAddress, bytes_to_find);
+    end         = std::chrono::steady_clock::now();
+    std::cout << "Spendt (scan_memory null) " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start_timer).count()
+              << "ms to find value\n";
+
+    start_timer = std::chrono::steady_clock::now();
+    auto out4   = scan_memory2(nullptr, bytes_to_find);
+    end         = std::chrono::steady_clock::now();
+    std::cout << "Spendt (scan_memory2 null) " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start_timer).count()
+              << "ms to find value\n";
+
+    std::cout << "scan_memory found: " << out.size() << "\n";
+    std::cout << "scan_memory2 found: " << out2.size() << "\n";
+    std::cout << "scan_memory null found: " << out3.size() << "\n";
+    std::cout << "scan_memory2 null found: " << out4.size() << "\n";
+
+    return out3;
 }
 
 // Way of DLL arguments from
@@ -162,6 +192,7 @@ Arguments* args  = nullptr;
 std::vector<const void*> address{};
 
 void find_bytes(HMODULE hMoudle) {
+    std::cout << "RUNNING FIND BYTES\n";
     if (args && args->new_run) {
         std::cout << "A WHOLE NEW RUN\n";
         int eu4             = args->eu4_date;
@@ -169,8 +200,9 @@ void find_bytes(HMODULE hMoudle) {
         auto bytes          = std::vector<uint8_t>(data, data + sizeof(eu4));
 
         address = scan_memory(bytes);
-        if (address.size() == 1) {
-            std::cout << "We most likely found the address point";
+        std::cout << "found entries " << address.size() << "\n";
+        for (auto&& addr : address) {
+            std::cout << "found on memory address: " << std::hex << addr << "\n" << std::dec;
         }
     }
     else if (args) {
@@ -179,8 +211,10 @@ void find_bytes(HMODULE hMoudle) {
         const uint8_t* data = static_cast<const uint8_t*>(static_cast<const void*>(&eu4));
         auto bytes          = std::vector<uint8_t>(data, data + sizeof(eu4));
         address             = scan_memory(address, bytes);
-        if (address.size() == 1) {
-            std::cout << "We most likely found the address point";
+
+        std::cout << "found entries " << address.size() << "\n";
+        for (auto&& addr : address) {
+            std::cout << "found on memory address: " << std::hex << addr << "\n" << std::dec;
         }
     }
     else {
