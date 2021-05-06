@@ -8,6 +8,7 @@
 #include <thread>      //std::thread
 #include <type_traits> //std::is_same_v
 #include <vector>      //std::vector
+#include <iostream>
 
 // OS specific
 #include <Windows.h>
@@ -66,7 +67,7 @@ public:
     template<typename T>
     void bytes_to_T(const uint8_t* addr, T& val) {
         if constexpr (std::is_same_v<T, std::string>) {
-            auto bytes = read_address(addr, v.size());
+            auto bytes = read_address(addr, val.size());
             val        = std::string(bytes.begin(), bytes.end());
         }
         else {
@@ -83,7 +84,7 @@ public:
     template<class T>
     static void scan_memory_func(std::mutex& g_queue,
                                  std::mutex& g_found,
-                                 std::queue<LowHighAddress>& address_queue,
+                                 std::vector<LowHighAddress>& address_queue,
                                  std::vector<const uint8_t*>& found,
                                  const T& find,
                                  WindowsMem* mem) {
@@ -97,8 +98,8 @@ public:
                     break;
                 }
                 // Get next element in queue
-                address = address_queue.front();
-                address_queue.pop();
+                address = *address_queue.begin();
+                address_queue.erase(address_queue.begin());
             }
             // Scan the memory of the assigned area we got
             auto sub_found = mem->scan_memory(address.address_low, address.address_high, find);
@@ -119,12 +120,11 @@ public:
         const auto max_size = std::thread::hardware_concurrency();
         std::vector<std::thread> threads(max_size);
         auto address_step = (address_high - address_low) / (max_size * 128);
-        std::cout << "Stepping: " << address_step << "\n";
 
         std::mutex g_queue{};
-        std::queue<LowHighAddress> address_queue{};
+        std::vector<LowHighAddress> address_queue{};
         for (auto address = address_low; address < address_high; address += address_step) {
-            address_queue.emplace(LowHighAddress{address, address + address_step});
+            address_queue.emplace_back(LowHighAddress{address, address + address_step});
         }
         for (size_t i = 0; i < max_size; i++) {
             threads[i] = std::thread(WindowsMem::scan_memory_func<T>,
@@ -179,7 +179,7 @@ public:
                     auto start = mem_chunk.data(), end = start + read, pos = start;
 
                     if (address > info.BaseAddress) {
-                        pos += (address - info.BaseAddress);
+                        pos += (address - static_cast<uint8_t*>(info.BaseAddress));
                     }
 
                     while ((pos = std::search(pos, end, byte_check.begin(), byte_check.end())) != end) {
