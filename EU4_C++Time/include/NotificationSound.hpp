@@ -35,8 +35,4 @@ public:
     void play();
     void set_device();
     void set_sound_file(const std::string& filename);
-    std::vector<std::string> get_devices() {
-        const ALCchar* devices = alcGetString(m_device, ALC_CAPTURE_DEVICE_SPECIFIER);
-        std::cout << devices;
-    }
 };
