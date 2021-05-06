@@ -1,4 +1,4 @@
-set(EXEC_NAME EU4_Notifi)
+set(EXEC_NAME eu4_notifi)
 add_executable(${EXEC_NAME})
 
 include(${CMAKE_CURRENT_LIST_DIR}/src/CMakeLists.txt)

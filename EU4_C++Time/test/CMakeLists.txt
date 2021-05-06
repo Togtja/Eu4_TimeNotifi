@@ -1,4 +1,4 @@
-set(EXEC_NAME External_eu4)
+set(EXEC_NAME external_eu4)
 add_executable(${EXEC_NAME})
 
 include(${CMAKE_CURRENT_LIST_DIR}/../ImGui/CMakeLists.txt)
