@@ -28,3 +28,13 @@ target_compile_features(
     PRIVATE
     cxx_std_20
 )
+
+add_custom_command(TARGET ${EXEC_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${PROJECT_SOURCE_DIR}/Resources/"
+        $<TARGET_FILE_DIR:${EXEC_NAME}>/Resources/)
+
+add_custom_command(TARGET ${EXEC_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy
+        "${PROJECT_BINARY_DIR}/_deps/openal-soft_external-build/OpenAL32.dll"
+        $<TARGET_FILE_DIR:${EXEC_NAME}>)
