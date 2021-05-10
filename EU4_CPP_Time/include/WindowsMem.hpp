@@ -8,21 +8,15 @@
 #include <thread>      //std::thread
 #include <type_traits> //std::is_same_v
 #include <vector>      //std::vector
-#include <iostream>
+
+// External Libaries
+#include <spdlog/spdlog.h>
 
 // OS specific
 #include <Windows.h>
 
 #include <TlHelp32.h>
 #include <psapi.h>
-
-#ifdef _WIN64
-static const std::string dll_path = "H:\\_Programming\\C++\\Eu4_TimeNotifi\\build\\Visual Studio Build Tools 2017 Release - "
-                                    "amd64\\Debug\\EU4_C++Time\\injection.dll";
-#elif _WIN32
-static const std::string dll_path = "H:\\_Programming\\C++\\Eu4_TimeNotifi\\build\\Visual Studio Build Tools 2017 Release - "
-                                    "amd64_x86\\Debug\\EU4_C++Time\\injection.dll";
-#endif
 
 class WindowsMem {
 private:
@@ -81,68 +75,105 @@ public:
         }
     }
 
-    template<class T>
+    struct MemInfo {
+        PVOID baseAddr;
+        SIZE_T regionSize;
+    };
+
     static void scan_memory_func(std::mutex& g_queue,
+                                 std::queue<MemInfo>& mem_queue,
                                  std::mutex& g_found,
-                                 std::vector<LowHighAddress>& address_queue,
-                                 std::vector<const uint8_t*>& found,
-                                 const T& find,
-                                 WindowsMem* mem) {
-        // Hey I will also work on the
-        LowHighAddress address;
-        while (true) {
+                                 std::vector<const uint8_t*>& addresses_found,
+                                 const std::atomic<bool>& searching,
+                                 const std::vector<uint8_t>& byte_check,
+                                 HANDLE proc) {
+        bool queue_empty = false;
+        MemInfo info{};
+        while (searching || !queue_empty) {
             {
-                std::lock_guard guard(g_queue);
-                if (address_queue.empty()) {
-                    // Nothing left in the queue, time to leave
-                    break;
+                std::lock_guard<std::mutex> guard(g_queue);
+                if (mem_queue.empty()) {
+                    queue_empty = true;
+                    continue;
                 }
-                // Get next element in queue
-                address = *address_queue.begin();
-                address_queue.erase(address_queue.begin());
+                else {
+                    info = mem_queue.front();
+                    mem_queue.pop();
+                    queue_empty = false;
+                }
             }
-            // Scan the memory of the assigned area we got
-            auto sub_found = mem->scan_memory(address.address_low, address.address_high, find);
-            if (!sub_found.empty()) {
-                std::lock_guard guard(g_found);
-                // Insert our finding
-                found.insert(found.end(), sub_found.begin(), sub_found.end());
+
+            std::vector<uint8_t> mem_chunk{};
+            size_t read;
+            mem_chunk.reserve(info.regionSize);
+            if (ReadProcessMemory(proc, info.baseAddr, mem_chunk.data(), info.regionSize, &read)) {
+                auto start = mem_chunk.data(), end = start + read, pos = start;
+                while ((pos = std::search(pos, end, byte_check.begin(), byte_check.end())) != end) {
+                    {
+                        std::lock_guard<std::mutex> guard(g_found);
+                        addresses_found.push_back(static_cast<const uint8_t*>(info.baseAddr) + (pos - start));
+                    }
+                    pos += byte_check.size();
+                }
             }
-            // Do it all again
         }
     }
 
     template<class T>
     std::vector<const uint8_t*> scan_memory_MT(uint8_t* address_low, uint8_t* address_high, const T& find) {
-        std::mutex g_found{};
-        std::vector<const uint8_t*> found;
-        // -2 due to allready using atleast 1 thread
-        const auto max_size = std::thread::hardware_concurrency();
-        std::vector<std::thread> threads(max_size);
-        auto address_step = (address_high - address_low) / (max_size * 128);
+        std::vector<uint8_t> byte_check;
+        if constexpr (std::is_same_v<T, std::string>) {
+            byte_check = std::vector<uint8_t>(find.begin(), find.end());
+        }
+        else {
+            const uint8_t* data = static_cast<const uint8_t*>(static_cast<const void*>(&find));
+            byte_check          = std::vector<uint8_t>(data, data + sizeof(find));
+        }
 
-        std::mutex g_queue{};
-        std::vector<LowHighAddress> address_queue{};
-        for (auto address = address_low; address < address_high; address += address_step) {
-            address_queue.emplace_back(LowHighAddress{address, address + address_step});
+        // all readable pages: adjust this as required
+        const DWORD pmask = PAGE_READONLY | PAGE_READWRITE;
+
+        MEMORY_BASIC_INFORMATION info{};
+
+        uint8_t* address = address_low;
+
+        size_t read;
+        std::mutex g_queue;
+        std::queue<MemInfo> mem_queue{};
+
+        std::mutex g_found;
+        std::vector<const uint8_t*> addresses_found;
+
+        const unsigned int MAX_T = std::thread::hardware_concurrency() * 2;
+        std::vector<std::thread> worker_threads(MAX_T);
+        std::atomic<bool> searching = true;
+
+        for (size_t i = 0; i < MAX_T; i++) {
+            worker_threads[i] = std::thread(WindowsMem::scan_memory_func,
+                                            std::ref(g_queue),
+                                            std::ref(mem_queue),
+                                            std::ref(g_found),
+                                            std::ref(addresses_found),
+                                            std::ref(searching),
+                                            std::ref(byte_check),
+                                            m_proc);
         }
-        for (size_t i = 0; i < max_size; i++) {
-            threads[i] = std::thread(WindowsMem::scan_memory_func<T>,
-                                     std::ref(g_queue),
-                                     std::ref(g_found),
-                                     std::ref(address_queue),
-                                     std::ref(found),
-                                     std::ref(find),
-                                     this);
+
+        while (address < address_high && VirtualQueryEx(m_proc, address, &info, sizeof(info))) {
+            if ((info.State == MEM_COMMIT) && (info.Protect & pmask) && !(info.Protect & PAGE_GUARD)) {
+                std::lock_guard guard(g_queue);
+                mem_queue.push({info.BaseAddress, info.RegionSize});
+            }
+            address += info.RegionSize;
         }
-        // This thread also joins the scanning
-        scan_memory_func<T>(g_queue, g_found, address_queue, found, find, this);
-        for (auto&& thread : threads) {
-            if (thread.joinable()) {
-                thread.join();
+        searching = false;
+        for (auto&& i : worker_threads) {
+            if (i.joinable()) {
+                i.join();
             }
         }
-        return found;
+
+        return addresses_found;
     }
 
     // Scan Memory
@@ -223,51 +254,12 @@ public:
                 }
             }
         }
-        // Multi Thread
-        std::cout << "MULTI TRACK DRIFTING\n";
         auto start_timer = std::chrono::steady_clock::now();
         auto out         = scan_memory_MT(nullptr, (uint8_t*)baseAddress, find);
         auto end         = std::chrono::steady_clock::now();
-        std::cout << "Spendt (scan_memory_MT) "
-                  << std::chrono::duration_cast<std::chrono::milliseconds>(end - start_timer).count() << "ms to find value\n";
-        start_timer = std::chrono::steady_clock::now();
-        auto out2   = scan_memory_MT(nullptr, (uint8_t*)baseAddress, find);
-        end         = std::chrono::steady_clock::now();
-        std::cout << "Spendt (scan_memory_MT) "
-                  << std::chrono::duration_cast<std::chrono::milliseconds>(end - start_timer).count() << "ms to find value\n";
-        start_timer = std::chrono::steady_clock::now();
-        out2        = scan_memory_MT(nullptr, (uint8_t*)baseAddress, find);
-        end         = std::chrono::steady_clock::now();
-        std::cout << "Spendt (scan_memory_MT) "
-                  << std::chrono::duration_cast<std::chrono::milliseconds>(end - start_timer).count() << "ms to find value\n";
-        start_timer = std::chrono::steady_clock::now();
-        out2        = scan_memory_MT(nullptr, (uint8_t*)baseAddress, find);
-        end         = std::chrono::steady_clock::now();
-        std::cout << "Spendt (scan_memory_MT) "
-                  << std::chrono::duration_cast<std::chrono::milliseconds>(end - start_timer).count() << "ms to find value\n";
-
-        // Single thread:
-        std::cout << "\n\nSINGLE TRACK DRIFTING\n";
-        start_timer = std::chrono::steady_clock::now();
-        out2        = scan_memory(nullptr, (uint8_t*)baseAddress, find);
-        end         = std::chrono::steady_clock::now();
-        std::cout << "Spendt (scan_memory) " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start_timer).count()
-                  << "ms to find value\n";
-        start_timer = std::chrono::steady_clock::now();
-        out2        = scan_memory(nullptr, (uint8_t*)baseAddress, find);
-        end         = std::chrono::steady_clock::now();
-        std::cout << "Spendt (scan_memory) " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start_timer).count()
-                  << "ms to find value\n";
-        start_timer = std::chrono::steady_clock::now();
-        out2        = scan_memory(nullptr, (uint8_t*)baseAddress, find);
-        end         = std::chrono::steady_clock::now();
-        std::cout << "Spendt (scan_memory) " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start_timer).count()
-                  << "ms to find value\n";
-        start_timer = std::chrono::steady_clock::now();
-        out2        = scan_memory(nullptr, (uint8_t*)baseAddress, find);
-        end         = std::chrono::steady_clock::now();
-        std::cout << "Spendt (scan_memory) " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start_timer).count()
-                  << "ms to find value\n";
+        spdlog::debug("spendt {}ms looking for results, and found {} results",
+                      std::chrono::duration_cast<std::chrono::milliseconds>(end - start_timer).count(),
+                      out.size());
         return out;
     }
 
