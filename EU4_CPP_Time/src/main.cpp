@@ -42,6 +42,7 @@ int main() {
 */
 
 int main(int argc, char* argv[]) {
+    spdlog::set_level(spdlog::level::debug);
     // Setup window
     glfwSetErrorCallback(glfw_error_callback);
     if (!glfwInit())
@@ -170,11 +171,6 @@ int main(int argc, char* argv[]) {
                     if (worker_thread.joinable()) {
                         worker_thread.join();
                     }
-                    // Eu4Date eu4date(day, month, year);
-                    // Eu4Date eu4loop(eu4date.get_days());
-                    // auto datet = eu4loop.get_date();
-                    // Eu4Date eu4loop2(datet.day, datet.month, datet.year);
-                    // std::cout << "eu4 loop: " << eu4loop.get_date_as_string() << " days: " << eu4loop2.get_days() << "\n";
 
                     worker_thread = std::thread([&mem, &running, &eu4_date_address, &foundEu4Memloc, &increase_day]() {
                         running = true;
@@ -188,17 +184,17 @@ int main(int argc, char* argv[]) {
                                     delete mem;
                                     mem = nullptr;
                                 }
-                                std::cout << e.what() << '\n';
+                                spdlog::error(e.what());
                             }
                         }
                         if (mem && !eu4_date_address.empty()) {
                             eu4_date_address = mem->find_byte_from_vector(eu4date.get_days(), eu4_date_address);
                         }
                         else if (mem) {
-                            std::cout << "Using find_value:\n";
+                            spdlog::debug("Scanning memory for {}", eu4date.get_days());
                             eu4_date_address = mem->scan_memory(eu4date.get_days());
                         }
-                        std::cout << "return size:" << eu4_date_address.size();
+                        spdlog::debug("Memory scan returned for {}", eu4_date_address.size());
                         if (mem && eu4_date_address.size() == 1) {
                             foundEu4Memloc = true;
                         }
@@ -272,18 +268,28 @@ int main(int argc, char* argv[]) {
                 }
                 ImGui::SameLine();
                 ImGui::InputInt("##eu4 notification year", &n_year, 1);
-                if (ImGui::Button("Submit", {200, 20})) {
+                if (ImGui::Button("Submit Notification", {200, 20})) {
                     notify_dates.push_back(Eu4Date(n_day, n_month, n_year));
                 }
             }
             if (!notify_dates.empty()) {
+                // Sort the dates
+                std::sort(notify_dates.begin(), notify_dates.end(), [](const Eu4Date& lhs, const Eu4Date& rhs) {
+                    return lhs.get_days() < rhs.get_days();
+                });
+                // Display and purge the gone-by dates
                 auto notify_dates_cpy = notify_dates;
-                for (auto eu4date : notify_dates_cpy) {
+                for (auto& eu4date : notify_dates_cpy) {
                     Eu4Date currDate(c_day, c_month, c_year);
                     if (eu4date.get_days() <= currDate.get_days()) {
-                        sound.play();
+                        if (worker_thread.joinable()) {
+                            worker_thread.join();
+                        }
+                        worker_thread = std::thread([&sound]() { sound.play(); });
                         notify_dates.erase(std::remove(notify_dates.begin(), notify_dates.end(), eu4date), notify_dates.end());
                     }
+                    // TODO: Display the dates here
+                    ImGui::Text("Notification for %s", eu4date.get_date_as_string().c_str());
                 }
             }
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
