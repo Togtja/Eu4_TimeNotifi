@@ -5,7 +5,6 @@
 #else
 #endif
 
-#include <iostream>
 #include <string>
 
 class CrossMemory {
@@ -18,7 +17,6 @@ private:
 public:
     template<class T>
     std::vector<const uint8_t*> scan_memory(T find) {
-        std::cout << "looking for: " << find << "\n";
         return mem->scan_memory(find);
     }
 
