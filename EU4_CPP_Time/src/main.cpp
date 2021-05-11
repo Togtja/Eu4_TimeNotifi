@@ -1,5 +1,7 @@
 // C++ Libraries
 #include <algorithm>
+#include <atomic>
+#include <chrono>
 #include <string>
 #include <thread>
 #include <unordered_map>
@@ -95,6 +97,10 @@ int main(int argc, char* argv[]) {
     bool foundEu4Memloc = false;
     bool increase_day   = false;
 
+    std::atomic_bool play_sound  = false;
+    std::atomic_bool exit_worker = false;
+
+    // TODO: make unique_ptr
     CrossMemory* mem = nullptr;
 
     std::vector<const uint8_t*> eu4_date_address{};
@@ -104,7 +110,7 @@ int main(int argc, char* argv[]) {
     const uint32_t MAX_THREADS = std::thread::hardware_concurrency() * 2 - 2;
     uint32_t nr_threads        = MAX_THREADS;
     std::thread worker_thread;
-    bool running = false;
+    std::atomic_bool running = false;
 
     // Display notification popup
     bool display_notification_popup = false;
@@ -226,6 +232,24 @@ int main(int argc, char* argv[]) {
                 c_month                           = _month;
                 current_month                     = month_name[_month - 1];
                 c_year                            = _year;
+
+                if (!running) {
+                    if (worker_thread.joinable()) {
+                        worker_thread.join();
+                    }
+                    running       = true;
+                    worker_thread = std::thread([&sound, &play_sound, &running, &exit_worker]() {
+                        while (!exit_worker) {
+                            if (play_sound) {
+                                sound.play();
+                                std::this_thread::sleep_for(std::chrono::seconds(1));
+                                play_sound = false;
+                            }
+                            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                        }
+                        running = false;
+                    });
+                }
             }
 
             // Displays the current date
@@ -297,7 +321,7 @@ int main(int argc, char* argv[]) {
                         if (worker_thread.joinable()) {
                             worker_thread.join();
                         }
-                        worker_thread = std::thread([&sound]() { sound.play(); });
+                        play_sound = true;
                         notify_dates.erase(std::remove(notify_dates.begin(), notify_dates.end(), eu4date), notify_dates.end());
                         if (!eu4date.message.empty()) {
                             ImGui::OpenPopup("Notification Popup");
@@ -339,6 +363,7 @@ int main(int argc, char* argv[]) {
 
         glfwSwapBuffers(window);
     }
+    exit_worker = true;
 
     // Cleanup
     ImGui_ImplOpenGL3_Shutdown();
