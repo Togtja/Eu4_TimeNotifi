@@ -120,7 +120,8 @@ public:
     }
 
     template<class T>
-    std::vector<const uint8_t*> scan_memory_MT(uint8_t* address_low, uint8_t* address_high, const T& find) {
+    std::vector<const uint8_t*>
+    scan_memory(uint8_t* address_low, uint8_t* address_high, const T& find, const uint32_t nr_threads) {
         std::vector<uint8_t> byte_check;
         if constexpr (std::is_same_v<T, std::string>) {
             byte_check = std::vector<uint8_t>(find.begin(), find.end());
@@ -144,7 +145,10 @@ public:
         std::mutex g_found;
         std::vector<const uint8_t*> addresses_found;
 
-        const unsigned int MAX_T = std::thread::hardware_concurrency() * 2;
+        uint32_t MAX_T = std::thread::hardware_concurrency() * 2;
+        if (nr_threads < MAX_T) {
+            MAX_T = nr_threads;
+        }
         std::vector<std::thread> worker_threads(MAX_T);
         std::atomic<bool> searching = true;
 
@@ -228,7 +232,7 @@ public:
     }
 
     template<class T>
-    std::vector<const uint8_t*> scan_memory(const T& find) {
+    std::vector<const uint8_t*> scan_memory(const T& find, const uint32_t nr_threads) {
         DWORD_PTR baseAddress = 0;
         DWORD_PTR maxAddress  = 0;
         DWORD cbNeeded;
@@ -238,7 +242,7 @@ public:
                 LPBYTE moduleArrayBytes = (LPBYTE)LocalAlloc(LPTR, cbNeeded);
 
                 if (moduleArrayBytes) {
-                    unsigned int moduleCount;
+                    uint32_t moduleCount;
 
                     moduleCount          = cbNeeded / sizeof(HMODULE);
                     HMODULE* moduleArray = (HMODULE*)moduleArrayBytes;
@@ -254,13 +258,19 @@ public:
                 }
             }
         }
+        std::vector<const uint8_t*> ret{};
         auto start_timer = std::chrono::steady_clock::now();
-        auto out         = scan_memory_MT(nullptr, (uint8_t*)baseAddress, find);
-        auto end         = std::chrono::steady_clock::now();
+        if (nr_threads <= 1) {
+            ret = scan_memory(nullptr, reinterpret_cast<uint8_t*>(baseAddress), find);
+        }
+        else {
+            ret = scan_memory(nullptr, reinterpret_cast<uint8_t*>(baseAddress), find, nr_threads);
+        }
+        auto end = std::chrono::steady_clock::now();
         spdlog::debug("spendt {}ms looking for results, and found {} results",
                       std::chrono::duration_cast<std::chrono::milliseconds>(end - start_timer).count(),
-                      out.size());
-        return out;
+                      ret.size());
+        return ret;
     }
 
     // void scan_inject(int find, bool new_run) { m_dll_inject.inject(find, new_run); }

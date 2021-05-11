@@ -100,6 +100,9 @@ int main(int argc, char* argv[]) {
     std::vector<const uint8_t*> eu4_date_address{};
     std::vector<Eu4_Notification> notify_dates{};
 
+    // Max concurrent thread -2 because (worker thread + current thread)
+    const uint32_t MAX_THREADS = std::thread::hardware_concurrency() * 2 - 2;
+    uint32_t nr_threads        = MAX_THREADS;
     std::thread worker_thread;
     bool running = false;
 
@@ -162,44 +165,53 @@ int main(int argc, char* argv[]) {
                 if (running) {
                     ImGui::Text("Working on finding the date in the game");
                 }
+                else {
+                    // TODO: Make this apart ofa debug menu
+                    ImGui::Text("How many threads to use for the search:");
+                    ImGui::SameLine();
+                    ImGui::InputScalar("##thread count", ImGuiDataType_U32, &nr_threads);
+                    if (nr_threads > MAX_THREADS) {
+                        nr_threads = MAX_THREADS;
+                    }
+                }
                 if (!running && ImGui::Button("Submit", {200, 20})) {
                     if (worker_thread.joinable()) {
                         worker_thread.join();
                     }
 
-                    worker_thread = std::thread([&mem, &running, &eu4_date_address, &foundEu4Memloc, &increase_day]() {
-                        running = true;
-                        Eu4Date eu4date(day, month, year);
-                        if (!mem) {
-                            try {
-                                mem = new CrossMemory(eu4exe);
-                            }
-                            catch (const std::exception& e) {
-                                if (mem) {
-                                    delete mem;
-                                    mem = nullptr;
+                    worker_thread =
+                        std::thread([&mem, &running, &eu4_date_address, &foundEu4Memloc, &increase_day, &nr_threads]() {
+                            running = true;
+                            Eu4Date eu4date(day, month, year);
+                            if (!mem) {
+                                try {
+                                    mem = new CrossMemory(eu4exe);
                                 }
-                                spdlog::error(e.what());
+                                catch (const std::exception& e) {
+                                    if (mem) {
+                                        delete mem;
+                                        mem = nullptr;
+                                    }
+                                    spdlog::error(e.what());
+                                }
                             }
-                        }
-                        if (mem && !eu4_date_address.empty()) {
-                            eu4_date_address = mem->find_byte_from_vector(eu4date.get_days(), eu4_date_address);
-                        }
-                        else if (mem) {
-                            // TODO: Add debug option to only use x-amount of threads (No higher than 2x HC)
-                            spdlog::debug("Scanning memory for {}", eu4date.get_days());
-                            eu4_date_address = mem->scan_memory(eu4date.get_days());
-                        }
-                        spdlog::debug("Memory scan returned for {}", eu4_date_address.size());
-                        if (mem && eu4_date_address.size() == 1) {
-                            foundEu4Memloc = true;
-                        }
-                        else if (mem) {
-                            increase_day = true;
-                        }
+                            if (mem && !eu4_date_address.empty()) {
+                                eu4_date_address = mem->find_byte_from_vector(eu4date.get_days(), eu4_date_address);
+                            }
+                            else if (mem) {
+                                spdlog::debug("Scanning memory for {} with {} thereds", eu4date.get_days(), nr_threads);
+                                eu4_date_address = mem->scan_memory(eu4date.get_days(), nr_threads);
+                            }
+                            spdlog::debug("Memory scan returned for {}", eu4_date_address.size());
+                            if (mem && eu4_date_address.size() == 1) {
+                                foundEu4Memloc = true;
+                            }
+                            else if (mem) {
+                                increase_day = true;
+                            }
 
-                        running = false;
-                    });
+                            running = false;
+                        });
                 }
                 c_day   = day;
                 c_month = month;

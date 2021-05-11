@@ -16,8 +16,8 @@ private:
 #endif
 public:
     template<class T>
-    std::vector<const uint8_t*> scan_memory(T find) {
-        return mem->scan_memory(find);
+    std::vector<const uint8_t*> scan_memory(T find, const uint32_t nr_threads) {
+        return mem->scan_memory(find, nr_threads);
     }
 
     template<typename T>
