@@ -30,7 +30,9 @@ static void glfw_error_callback(int error, const char* description) {
 struct Eu4_Notification {
     Eu4Date date;
     std::string message{};
-    bool operator==(const Eu4_Notification& rhs) { return date == rhs.date && message == rhs.message; }
+    uint32_t repeat      = 1;
+    uint32_t repeat_days = 0;
+    bool operator==(const Eu4_Notification& rhs) { return date == rhs.date && message == rhs.message && repeat == rhs.repeat; }
 };
 
 // TODO: Move a lot into functions / classes
@@ -114,7 +116,7 @@ int main(int argc, char* argv[]) {
 
     // Display notification popup
     bool display_notification_popup = false;
-    std::string popup_msg{};
+    std::vector<std::string> popup_msg{};
 
     // Main loop
     while (!glfwWindowShouldClose(window)) {
@@ -258,7 +260,7 @@ int main(int argc, char* argv[]) {
 
             ImGui::Text("Current Eu4 Date"); // Display some text (you can use a format strings too)
             ImGui::PushItemWidth(100);
-            // ImGui::Text(fmt::format("{}", c_day).c_str());
+
             ImGui::InputInt("##eu4 current day", &c_day, 0, ImGuiInputTextFlags_ReadOnly);
             ImGui::SameLine();
             if (ImGui::BeginCombo("##eu4 current month", current_month.c_str(), ImGuiComboFlags_NoArrowButton)) {
@@ -299,12 +301,17 @@ int main(int argc, char* argv[]) {
                 }
                 ImGui::SameLine();
                 static std::string notify_msg{};
+                static uint32_t notify_repeat      = 1;
+                static uint32_t notify_repeat_days = 0;
                 ImGui::InputInt("##eu4 notification year", &n_year, 1);
                 ImGui::PushItemWidth(200);
-                ImGui::InputText("##eu4 notification msg", &notify_msg);
-                // TODO: Add repeatable notifications
+                ImGui::InputText("Notification Message", &notify_msg);
+                // TODO: Ensure size of message is not to big
+                ImGui::InputScalar("repeat (0 = infinite)", ImGuiDataType_U32, &notify_repeat);
+                // TODO: Make it possible to repeat every x monnth or x years
+                ImGui::InputScalar("repeat every x days", ImGuiDataType_U32, &notify_repeat_days);
                 if (ImGui::Button("Submit Notification", {200, 20})) {
-                    notify_dates.push_back({Eu4Date(n_day, n_month, n_year), notify_msg});
+                    notify_dates.push_back({Eu4Date(n_day, n_month, n_year), notify_msg, notify_repeat, notify_repeat_days});
                     notify_msg = "";
                 }
             }
@@ -322,14 +329,30 @@ int main(int argc, char* argv[]) {
                             worker_thread.join();
                         }
                         play_sound = true;
+                        // Remove if is not set to infinite
                         notify_dates.erase(std::remove(notify_dates.begin(), notify_dates.end(), eu4date), notify_dates.end());
+
+                        // If 0 always repeat
+                        if (eu4date.repeat == 0) {
+                            eu4date.date = Eu4Date(eu4date.date.get_days() + eu4date.repeat_days);
+                            notify_dates.push_back(eu4date);
+                        }
+                        else {
+                            eu4date.repeat--;
+                            // If not 0 after repeat subtraction, then repeat
+                            if (eu4date.repeat > 0) {
+                                eu4date.date = Eu4Date(eu4date.date.get_days() + eu4date.repeat_days);
+                                notify_dates.push_back(eu4date);
+                            }
+                        }
+
                         if (!eu4date.message.empty()) {
-                            ImGui::OpenPopup("Notification Popup");
-                            popup_msg = eu4date.message;
+                            popup_msg.push_back(eu4date.message + " (" + eu4date.date.get_date_as_string() + ")");
                         }
                     }
                     // Display the dates here
-                    ImGui::Text(fmt::format("Notification for {}", eu4date.date.get_date_as_string()).c_str());
+                    ImGui::Text(
+                        fmt::format("Notification for: {} ({})", eu4date.message, eu4date.date.get_date_as_string()).c_str());
                     ImGui::SameLine();
                     if (ImGui::Button("X", {15, 15})) {
                         notify_dates.erase(std::remove(notify_dates.begin(), notify_dates.end(), eu4date), notify_dates.end());
@@ -337,15 +360,20 @@ int main(int argc, char* argv[]) {
                 }
             }
 
-            // TODO: Center and stack notifications
+            if (ImGui::IsAnyItemFocused() && !popup_msg.empty()) {
+                ImGui::OpenPopup("Notification Popup");
+            }
             if (ImGui::BeginPopup("Notification Popup")) {
-                ImGui::Text(popup_msg.c_str());
+                for (auto&& msg : popup_msg) {
+                    ImGui::Text(msg.c_str());
+                }
                 if (ImGui::Button("Ok", {200, 20})) {
                     ImGui::CloseCurrentPopup();
+                    popup_msg.clear();
                 }
+
                 ImGui::EndPopup();
             }
-
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
                         1000.0f / ImGui::GetIO().Framerate,
                         ImGui::GetIO().Framerate);
