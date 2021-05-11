@@ -24,22 +24,14 @@
 static void glfw_error_callback(int error, const char* description) {
     spdlog::log(spdlog::level::critical, "GLFW Error {}: {}", error, description);
 }
-/**
-int main() {
-    // CrossMemory mem("eu4.exe");
-    DllInjector dll_inject(dll_path, "external_eu4.exe");
-    spdlog::log(spdlog::level::info, "Enter a key to inject");
-    int find;
-    std::cin >> find;
-    dll_inject.inject(find, true);
-    while (true) {
-        int find;
-        std::cin >> find;
-        dll_inject.inject(find, false);
-    }
-}
-*/
 
+struct Eu4_Notification {
+    Eu4Date date;
+    std::string message{};
+    bool operator==(const Eu4_Notification& rhs) { return date == rhs.date && message == rhs.message; }
+};
+
+// TODO: Move a lot into functions / classes
 int main(int argc, char* argv[]) {
     spdlog::set_level(spdlog::level::debug);
     // Setup window
@@ -106,10 +98,14 @@ int main(int argc, char* argv[]) {
     CrossMemory* mem = nullptr;
 
     std::vector<const uint8_t*> eu4_date_address{};
-    std::vector<Eu4Date> notify_dates{};
+    std::vector<Eu4_Notification> notify_dates{};
 
     std::thread worker_thread;
     bool running = false;
+
+    // Display notification popup
+    bool display_notification_popup = false;
+    std::string popup_msg{};
 
     // Main loop
     while (!glfwWindowShouldClose(window)) {
@@ -190,6 +186,7 @@ int main(int argc, char* argv[]) {
                             eu4_date_address = mem->find_byte_from_vector(eu4date.get_days(), eu4_date_address);
                         }
                         else if (mem) {
+                            // TODO: Add debug option to only use x-amount of threads (No higher than 2x HC)
                             spdlog::debug("Scanning memory for {}", eu4date.get_days());
                             eu4_date_address = mem->scan_memory(eu4date.get_days());
                         }
@@ -217,11 +214,11 @@ int main(int argc, char* argv[]) {
                 c_month                           = _month;
                 current_month                     = month_name[_month - 1];
                 c_year                            = _year;
-                // TODO: set c_day from day etc...
             }
 
             // Displays the current date
-            // If anyone read this help me not use readonly inout and a fake combo list, but keep the theme from the input
+            // If anyone read this: help me not use readonly inoput and a fake combo list, but keep the theme/aesthetic the the
+            // input does
 
             ImGui::Text("Current Eu4 Date"); // Display some text (you can use a format strings too)
             ImGui::PushItemWidth(100);
@@ -250,7 +247,6 @@ int main(int argc, char* argv[]) {
                 }
                 ImGui::Text("Add a notification for a specific date"); // Display some text (you can use a format strings too)
                 ImGui::PushItemWidth(100);
-                // ImGui::Text(fmt::format("{}", c_day).c_str());
                 ImGui::InputInt("##eu4 notification day", &n_day, 1);
                 ImGui::SameLine();
                 if (ImGui::BeginCombo("##eu4 notification month", month_name[n_month - 1].c_str())) {
@@ -266,31 +262,54 @@ int main(int argc, char* argv[]) {
                     ImGui::EndCombo();
                 }
                 ImGui::SameLine();
+                static std::string notify_msg{};
                 ImGui::InputInt("##eu4 notification year", &n_year, 1);
+                ImGui::PushItemWidth(200);
+                ImGui::InputText("##eu4 notification msg", &notify_msg);
+                // TODO: Add repeatable notifications
                 if (ImGui::Button("Submit Notification", {200, 20})) {
-                    notify_dates.push_back(Eu4Date(n_day, n_month, n_year));
+                    notify_dates.push_back({Eu4Date(n_day, n_month, n_year), notify_msg});
+                    notify_msg = "";
                 }
             }
             if (!notify_dates.empty()) {
                 // Sort the dates
-                std::sort(notify_dates.begin(), notify_dates.end(), [](const Eu4Date& lhs, const Eu4Date& rhs) {
-                    return lhs.get_days() < rhs.get_days();
+                std::sort(notify_dates.begin(), notify_dates.end(), [](const auto& lhs, const auto& rhs) {
+                    return lhs.date.get_days() < rhs.date.get_days();
                 });
                 // Display and purge the gone-by dates
                 auto notify_dates_cpy = notify_dates;
                 for (auto& eu4date : notify_dates_cpy) {
                     Eu4Date currDate(c_day, c_month, c_year);
-                    if (eu4date.get_days() <= currDate.get_days()) {
+                    if (eu4date.date.get_days() <= currDate.get_days()) {
                         if (worker_thread.joinable()) {
                             worker_thread.join();
                         }
                         worker_thread = std::thread([&sound]() { sound.play(); });
                         notify_dates.erase(std::remove(notify_dates.begin(), notify_dates.end(), eu4date), notify_dates.end());
+                        if (!eu4date.message.empty()) {
+                            ImGui::OpenPopup("Notification Popup");
+                            popup_msg = eu4date.message;
+                        }
                     }
-                    // TODO: Display the dates here
-                    ImGui::Text("Notification for %s", eu4date.get_date_as_string().c_str());
+                    // Display the dates here
+                    ImGui::Text(fmt::format("Notification for {}", eu4date.date.get_date_as_string()).c_str());
+                    ImGui::SameLine();
+                    if (ImGui::Button("X", {15, 15})) {
+                        notify_dates.erase(std::remove(notify_dates.begin(), notify_dates.end(), eu4date), notify_dates.end());
+                    }
                 }
             }
+
+            // TODO: Center and stack notifications
+            if (ImGui::BeginPopup("Notification Popup")) {
+                ImGui::Text(popup_msg.c_str());
+                if (ImGui::Button("Ok", {200, 20})) {
+                    ImGui::CloseCurrentPopup();
+                }
+                ImGui::EndPopup();
+            }
+
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
                         1000.0f / ImGui::GetIO().Framerate,
                         ImGui::GetIO().Framerate);
