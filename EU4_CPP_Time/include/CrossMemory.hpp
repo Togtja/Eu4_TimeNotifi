@@ -5,13 +5,15 @@
 #else
 #endif
 
+#include <memory>
 #include <string>
 
 class CrossMemory {
 private:
     std::string m_exec_name{};
 #ifdef _WIN32
-    WindowsMem* mem = nullptr;
+    // WindowsMem* mem = nullptr;
+    std::unique_ptr<WindowsMem> mem = nullptr;
 #else
 #endif
 public:
@@ -37,11 +39,7 @@ public:
 };
 
 CrossMemory::CrossMemory(const std::string& exec_name) : m_exec_name(exec_name) {
-    mem = new WindowsMem(exec_name);
+    mem.reset(new WindowsMem(exec_name));
 }
 
-CrossMemory::~CrossMemory() {
-    if (mem) {
-        delete mem;
-    }
-}
+CrossMemory::~CrossMemory() {}

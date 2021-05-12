@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <memory>
 #include <string>
 #include <thread>
 #include <unordered_map>
@@ -102,8 +103,8 @@ int main(int argc, char* argv[]) {
     std::atomic_bool play_sound  = false;
     std::atomic_bool exit_worker = false;
 
-    // TODO: make unique_ptr
-    CrossMemory* mem = nullptr;
+    // Pointer to a memory class, that include some nice memory functions
+    std::unique_ptr<CrossMemory> mem = nullptr;
 
     std::vector<const uint8_t*> eu4_date_address{};
     std::vector<Eu4_Notification> notify_dates{};
@@ -187,43 +188,40 @@ int main(int argc, char* argv[]) {
                         worker_thread.join();
                     }
 
-                    worker_thread =
-                        std::thread([&mem, &running, &eu4_date_address, &foundEu4Memloc, &increase_day, &nr_threads]() {
-                            running = true;
-                            Eu4Date eu4date(day, month, year);
-                            if (!mem) {
-                                try {
-                                    mem = new CrossMemory(eu4exe);
+                    if (!mem) {
+                        try {
+                            mem.reset(new CrossMemory(eu4exe));
+                        }
+                        catch (const std::exception& e) {
+                            if (mem) {
+                                mem.reset(nullptr);
+                            }
+                            spdlog::error(e.what());
+                        }
+                    }
+                    else {
+                        worker_thread = std::thread(
+                            [&mem, &running, &eu4_date_address, &foundEu4Memloc, &increase_day, &nr_threads, eu4date]() {
+                                running = true;
+                                if (mem && !eu4_date_address.empty()) {
+                                    eu4_date_address = mem->find_byte_from_vector(eu4date.get_days(), eu4_date_address);
                                 }
-                                catch (const std::exception& e) {
-                                    if (mem) {
-                                        delete mem;
-                                        mem = nullptr;
-                                    }
-                                    spdlog::error(e.what());
+                                else if (mem) {
+                                    spdlog::debug("Scanning memory for {} with {} thereds", eu4date.get_days(), nr_threads);
+                                    eu4_date_address = mem->scan_memory(eu4date.get_days(), nr_threads);
                                 }
-                            }
-                            if (mem && !eu4_date_address.empty()) {
-                                eu4_date_address = mem->find_byte_from_vector(eu4date.get_days(), eu4_date_address);
-                            }
-                            else if (mem) {
-                                spdlog::debug("Scanning memory for {} with {} thereds", eu4date.get_days(), nr_threads);
-                                eu4_date_address = mem->scan_memory(eu4date.get_days(), nr_threads);
-                            }
-                            spdlog::debug("Memory scan returned for {}", eu4_date_address.size());
-                            if (mem && eu4_date_address.size() == 1) {
-                                foundEu4Memloc = true;
-                            }
-                            else if (mem) {
-                                increase_day = true;
-                            }
+                                spdlog::debug("Memory scan returned for {}", eu4_date_address.size());
+                                if (mem && eu4_date_address.size() == 1) {
+                                    foundEu4Memloc = true;
+                                }
+                                else if (mem) {
+                                    increase_day = true;
+                                }
 
-                            running = false;
-                        });
+                                running = false;
+                            });
+                    }
                 }
-                c_day   = day;
-                c_month = month;
-                c_year  = year;
             }
             else {
                 uint32_t eu4_date_read{};
@@ -397,9 +395,6 @@ int main(int argc, char* argv[]) {
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
-    if (mem) {
-        delete mem;
-    }
 
     glfwDestroyWindow(window);
     glfwTerminate();
