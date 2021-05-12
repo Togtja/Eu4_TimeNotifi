@@ -3,6 +3,7 @@ add_executable(${EXEC_NAME})
 
 include(${CMAKE_CURRENT_LIST_DIR}/src/CMakeLists.txt)
 include(${CMAKE_CURRENT_LIST_DIR}/ImGui/CMakeLists.txt)
+include(${CMAKE_CURRENT_LIST_DIR}/stb/CMakeLists.txt)
 
 add_library(injection SHARED ${CMAKE_CURRENT_LIST_DIR}/src/injection.cpp)
 
@@ -11,6 +12,7 @@ target_include_directories(
     PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/include
     ${CMAKE_CURRENT_LIST_DIR}/ImGui
+    ${CMAKE_CURRENT_LIST_DIR}/stb
 )
 target_link_libraries(
     ${EXEC_NAME}

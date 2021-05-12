@@ -3,6 +3,7 @@
 #include <array>
 #include <atomic>
 #include <chrono>
+#include <filesystem>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -10,13 +11,17 @@
 #include <unordered_map>
 #include <vector>
 
+#define SAIL_BUILD 1
+#define STB_IMAGE_IMPLEMENTATION
 // External Libraries
 #include <glad/glad.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
 #include <imgui_internal.h>
 #include <imgui_stdlib.h>
+
 #include <spdlog/spdlog.h>
+#include <stb_image.h>
 
 // Need to include glfe3 after glad + imgui
 #include <GLFW/glfw3.h>
@@ -28,6 +33,51 @@
 
 static void glfw_error_callback(int error, const char* description) {
     spdlog::log(spdlog::level::critical, "GLFW Error {}: {}", error, description);
+}
+
+struct eu4noti_image {
+    GLuint texture;
+    int width;
+    int height;
+};
+
+bool load_texture(std::string image_file, eu4noti_image& image) {
+    if (!std::filesystem::exists(image_file)) {
+        return false;
+    }
+    // Load from file
+    int image_width  = 0;
+    int image_height = 0;
+    int comp;
+    unsigned char* image_data = stbi_load(image_file.c_str(), &image_width, &image_height, &comp, STBI_rgb_alpha);
+    if (image_data == NULL)
+        return false;
+
+    // Create a OpenGL texture identifier
+    GLuint image_texture;
+    glGenTextures(1, &image_texture);
+    glBindTexture(GL_TEXTURE_2D, image_texture);
+
+    // Setup filtering parameters for display
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D,
+                    GL_TEXTURE_WRAP_S,
+                    GL_CLAMP_TO_EDGE); // This is required on WebGL for non power-of-two textures
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); // Same
+
+    // Upload pixels into texture
+#if defined(GL_UNPACK_ROW_LENGTH) && !defined(__EMSCRIPTEN__)
+    glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+#endif
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image_width, image_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image_data);
+    stbi_image_free(image_data);
+
+    image.texture = image_texture;
+    image.width   = image_width;
+    image.height  = image_height;
+
+    return true;
 }
 
 struct Eu4_Notification {
@@ -82,6 +132,13 @@ int main(int argc, char* argv[]) {
     // Setup Platform/Renderer backends
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version.c_str());
+
+    // Load texture
+    eu4noti_image image;
+    if (!load_texture("Resources/Images/settings.png", image)) {
+        spdlog::critical("Failed to load setting image");
+        return 1;
+    }
 
     // Our state
     bool show_demo_window = true;
@@ -145,7 +202,7 @@ int main(int argc, char* argv[]) {
                          ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoFocusOnAppearing |
                              ImGuiWindowFlags_NoBackground |
                              ImGuiWindowFlags_NoDecoration); // Create a window called "Hello, world!" and append into it.
-
+            ImGui::Image((void*)&image.texture, ImVec2(image.width, image.height));
             int c_day{11}, c_month{11}, c_year{1444};
 
             Eu4Date eu4date(n_day, n_month, n_year);
