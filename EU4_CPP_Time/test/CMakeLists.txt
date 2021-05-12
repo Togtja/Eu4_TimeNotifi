@@ -1,7 +1,7 @@
 set(EXEC_NAME external_eu4)
 add_executable(${EXEC_NAME})
 
-include(${CMAKE_CURRENT_LIST_DIR}/../ImGui/CMakeLists.txt)
+include(${CMAKE_CURRENT_LIST_DIR}/../external_headers/ImGui/CMakeLists.txt)
 
 target_sources(
         ${EXEC_NAME}

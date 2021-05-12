@@ -2,8 +2,8 @@ set(EXEC_NAME eu4_notifi)
 add_executable(${EXEC_NAME})
 
 include(${CMAKE_CURRENT_LIST_DIR}/src/CMakeLists.txt)
-include(${CMAKE_CURRENT_LIST_DIR}/ImGui/CMakeLists.txt)
-include(${CMAKE_CURRENT_LIST_DIR}/stb/CMakeLists.txt)
+include(${CMAKE_CURRENT_LIST_DIR}/external_headers/ImGui/CMakeLists.txt)
+include(${CMAKE_CURRENT_LIST_DIR}/external_headers/stb/CMakeLists.txt)
 
 add_library(injection SHARED ${CMAKE_CURRENT_LIST_DIR}/src/injection.cpp)
 
@@ -11,8 +11,7 @@ target_include_directories(
     ${EXEC_NAME}
     PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/include
-    ${CMAKE_CURRENT_LIST_DIR}/ImGui
-    ${CMAKE_CURRENT_LIST_DIR}/stb
+    ${CMAKE_CURRENT_LIST_DIR}/external_headers
 )
 target_link_libraries(
     ${EXEC_NAME}

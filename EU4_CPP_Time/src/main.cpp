@@ -14,14 +14,15 @@
 #define SAIL_BUILD 1
 #define STB_IMAGE_IMPLEMENTATION
 // External Libraries
+#include <ImGui/imgui_impl_glfw.h>
+#include <ImGui/imgui_impl_opengl3.h>
+#include <ImGui/imgui_internal.h>
+#include <ImGui/imgui_stdlib.h>
 #include <glad/glad.h>
-#include <imgui_impl_glfw.h>
-#include <imgui_impl_opengl3.h>
-#include <imgui_internal.h>
-#include <imgui_stdlib.h>
+
 
 #include <spdlog/spdlog.h>
-#include <stb_image.h>
+#include <stb/stb_image.h>
 
 // Need to include glfe3 after glad + imgui
 #include <GLFW/glfw3.h>
