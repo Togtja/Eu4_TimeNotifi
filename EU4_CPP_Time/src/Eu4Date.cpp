@@ -1,8 +1,6 @@
 #include "Eu4Date.hpp"
 
-Eu4Date::Eu4Date(uint32_t days) {
-    m_days = days;
-
+void Eu4Date::eu4days_to_eu4date(uint32_t days) {
     m_year = days / 365;
     days -= m_year * 365;
 
@@ -20,18 +18,21 @@ Eu4Date::Eu4Date(uint32_t days) {
     }
 }
 
-Eu4Date::Eu4Date(uint8_t day, uint8_t month, uint16_t year) {
-    m_day   = day;
-    m_month = month;
-    m_year  = year;
+Eu4Date::Eu4Date(uint32_t days) {
+    m_days = days;
+    eu4days_to_eu4date(m_days);
+}
 
+Eu4Date::Eu4Date(uint8_t day, uint8_t month, uint16_t year) {
     m_days = year * 365;
-    for (size_t i = 1; i <= m_month - 1; i++) {
+    for (size_t i = 1; i <= month - 1; i++) {
         m_days += months_days[i - 1];
     }
     m_days += day;
     // Remove one ? cus it works
     m_days--;
+
+    eu4days_to_eu4date(m_days);
 }
 
 Eu4Date::~Eu4Date() {}

@@ -1,9 +1,11 @@
 // C++ Libraries
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <unordered_map>
 #include <vector>
@@ -82,21 +84,22 @@ int main(int argc, char* argv[]) {
     ImGui_ImplOpenGL3_Init(glsl_version.c_str());
 
     // Our state
-    bool show_demo_window                     = true;
-    ImVec4 clear_color                        = ImVec4(0.65f, 0.55f, 0.60f, 1.00f);
-    const std::vector<std::string> month_name = {"1:January",
-                                                 "2:February",
-                                                 "3:March",
-                                                 "4:April",
-                                                 "5:May",
-                                                 "6:June",
-                                                 "7:July",
-                                                 "8:August",
-                                                 "9:September",
-                                                 "10:October",
-                                                 "11:November",
-                                                 "12:December"};
-    std::string current_month{"11:November"};
+    bool show_demo_window = true;
+    // Background color
+    const ImVec4 clear_color                              = ImVec4(0.65f, 0.55f, 0.60f, 1.00f);
+    constexpr std::array<std::string_view, 12> month_name = {"1:January",
+                                                             "2:February",
+                                                             "3:March",
+                                                             "4:April",
+                                                             "5:May",
+                                                             "6:June",
+                                                             "7:July",
+                                                             "8:August",
+                                                             "9:September",
+                                                             "10:October",
+                                                             "11:November",
+                                                             "12:December"};
+    std::string current_month{month_name[10]};
     bool foundEu4Memloc = false;
     bool increase_day   = false;
 
@@ -119,6 +122,8 @@ int main(int argc, char* argv[]) {
     bool display_notification_popup = false;
     std::vector<std::string> popup_msg{};
 
+    static int n_day{11}, n_month{11}, n_year{1444};
+
     // Main loop
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
@@ -139,29 +144,37 @@ int main(int argc, char* argv[]) {
                          ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoFocusOnAppearing |
                              ImGuiWindowFlags_NoBackground |
                              ImGuiWindowFlags_NoDecoration); // Create a window called "Hello, world!" and append into it.
-            static int day{11}, month{11}, year{1444};
+
             int c_day{11}, c_month{11}, c_year{1444};
+
+            Eu4Date eu4date(n_day, n_month, n_year);
+            auto notiDateStruct = eu4date.get_date();
+            n_day               = notiDateStruct.day;
+            n_month             = notiDateStruct.month;
+            current_month       = month_name[n_month - 1];
+            n_year              = notiDateStruct.year;
+
             // Find the eu4 Date:
             if (!foundEu4Memloc) {
                 static std::string eu4exe{"eu4.exe"};
                 if (!increase_day) {
                     ImGui::Text("Eu4 excecutable name (typically eu4.exe):");
                     ImGui::InputText("##eu4 exe", &eu4exe);
-                    ImGui::Text("Enter the current EU4 Date:"); // Display some text (you can use a format strings too)
+                    ImGui::Text("Enter the current EU4 Date:");
                 }
                 else {
                     ImGui::Text("Enter a different EU4 Date:");
                 }
-                const std::string eu4_insert_date_txt = "##eu4 date";
+
                 ImGui::PushItemWidth(100);
-                ImGui::InputInt("##eu4 day", &day);
+                ImGui::InputInt("##eu4 day", &n_day);
                 ImGui::SameLine();
                 if (ImGui::BeginCombo("##eu4 month", current_month.c_str(), 0)) {
                     for (int i = 0; i < month_name.size(); i++) {
-                        bool is_selected = (month == i + 1);
-                        if (ImGui::Selectable(month_name[i].c_str(), is_selected)) {
+                        bool is_selected = (n_month == i + 1);
+                        if (ImGui::Selectable(month_name[i].data(), is_selected)) {
                             current_month = month_name[i];
-                            month         = i + 1;
+                            n_month       = i + 1;
                         }
                         if (is_selected) {
                             ImGui::SetItemDefaultFocus();
@@ -170,7 +183,7 @@ int main(int argc, char* argv[]) {
                     ImGui::EndCombo();
                 }
                 ImGui::SameLine();
-                ImGui::InputInt("##eu4 year", &year);
+                ImGui::InputInt("##eu4 year", &n_year);
                 if (running) {
                     ImGui::Text("Working on finding the date in the game");
                 }
@@ -222,6 +235,9 @@ int main(int argc, char* argv[]) {
                             });
                     }
                 }
+                c_day   = n_day;
+                c_month = n_month;
+                c_year  = n_year;
             }
             else {
                 uint32_t eu4_date_read{};
@@ -273,22 +289,14 @@ int main(int argc, char* argv[]) {
             ImGui::InputInt("##eu4 current year", &c_year, 0, ImGuiInputTextFlags_ReadOnly);
 
             if (foundEu4Memloc) {
-                static int n_day{11}, n_month{11}, n_year{1444};
-                Eu4Date currDate(c_day, c_month, c_year);
-                Eu4Date notiDate(n_day, n_month, n_year);
-                if (notiDate.get_days() < currDate.get_days()) {
-                    n_day   = c_day;
-                    n_month = c_month;
-                    n_year  = c_year;
-                }
                 ImGui::Text("Add a notification for a specific date"); // Display some text (you can use a format strings too)
                 ImGui::PushItemWidth(100);
                 ImGui::InputInt("##eu4 notification day", &n_day, 1);
                 ImGui::SameLine();
-                if (ImGui::BeginCombo("##eu4 notification month", month_name[n_month - 1].c_str())) {
+                if (ImGui::BeginCombo("##eu4 notification month", month_name[n_month - 1].data())) {
                     for (int i = 0; i < month_name.size(); i++) {
                         bool is_selected = (n_month == i + 1);
-                        if (ImGui::Selectable(month_name[i].c_str(), is_selected)) {
+                        if (ImGui::Selectable(month_name[i].data(), is_selected)) {
                             n_month = i + 1;
                         }
                         if (is_selected) {
@@ -308,8 +316,17 @@ int main(int argc, char* argv[]) {
                 ImGui::InputScalar("repeat (0 = infinite)", ImGuiDataType_U32, &notify_repeat);
                 // TODO: Make it possible to repeat every x monnth or x years
                 ImGui::InputScalar("repeat every x days", ImGuiDataType_U32, &notify_repeat_days);
+
+                // Ensure that the date is not before the current date
+                Eu4Date currDate(c_day, c_month, c_year);
+                if (eu4date.get_days() < currDate.get_days()) {
+                    n_day   = c_day;
+                    n_month = c_month;
+                    n_year  = c_year;
+                }
+
                 if (ImGui::Button("Submit Notification", {200, 20})) {
-                    notify_dates.push_back({Eu4Date(n_day, n_month, n_year), notify_msg, notify_repeat, notify_repeat_days});
+                    notify_dates.push_back({eu4date, notify_msg, notify_repeat, notify_repeat_days});
                     notify_msg = "";
                 }
             }
@@ -323,9 +340,6 @@ int main(int argc, char* argv[]) {
                 for (auto& eu4date : notify_dates_cpy) {
                     Eu4Date currDate(c_day, c_month, c_year);
                     if (eu4date.date.get_days() <= currDate.get_days()) {
-                        if (worker_thread.joinable()) {
-                            worker_thread.join();
-                        }
                         play_sound = true;
                         // Remove if is not set to infinite
                         notify_dates.erase(std::remove(notify_dates.begin(), notify_dates.end(), eu4date), notify_dates.end());

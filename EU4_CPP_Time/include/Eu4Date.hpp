@@ -18,6 +18,8 @@ private:
     uint8_t m_month{};
     uint16_t m_year{};
 
+    void eu4days_to_eu4date(uint32_t days);
+
 public:
     bool operator==(const Eu4Date& rhs) {
         return m_days == rhs.m_days && m_day == rhs.m_day && m_month == rhs.m_month && m_year == rhs.m_year;
