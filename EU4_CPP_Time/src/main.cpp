@@ -121,6 +121,7 @@ int main(int argc, char* argv[]) {
     // Display notification popup
     bool display_notification_popup = false;
     std::vector<std::string> popup_msg{};
+    constexpr size_t MAX_NOTIFY_MSG = 200;
 
     static int n_day{11}, n_month{11}, n_year{1444};
 
@@ -312,7 +313,9 @@ int main(int argc, char* argv[]) {
                 ImGui::InputInt("##eu4 notification year", &n_year, 1);
                 ImGui::PushItemWidth(200);
                 ImGui::InputText("Notification Message", &notify_msg);
-                // TODO: Ensure size of message is not to big
+                if (notify_msg.size() > MAX_NOTIFY_MSG) {
+                    notify_msg.resize(MAX_NOTIFY_MSG);
+                }
                 ImGui::InputScalar("repeat (0 = infinite)", ImGuiDataType_U32, &notify_repeat);
                 // TODO: Make it possible to repeat every x monnth or x years
                 ImGui::InputScalar("repeat every x days", ImGuiDataType_U32, &notify_repeat_days);
@@ -372,8 +375,10 @@ int main(int argc, char* argv[]) {
                 }
             }
 
-            if (ImGui::IsAnyItemFocused() && !popup_msg.empty()) {
+            if (ImGui::IsWindowFocused() && !popup_msg.empty()) {
                 ImGui::OpenPopup("Notification Popup");
+                ImVec2 windows_center = {window_size.x / 2, window_size.y / 2};
+                ImGui::SetNextWindowPos(windows_center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
             }
             if (ImGui::BeginPopup("Notification Popup")) {
                 for (auto&& msg : popup_msg) {
