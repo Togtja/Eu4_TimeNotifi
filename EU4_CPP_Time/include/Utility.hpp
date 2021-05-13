@@ -45,7 +45,7 @@ void start_find_eu4date_in_memory(std::thread& thread,
                                   uint32_t& nr_threads,
                                   std::unique_ptr<CrossMemory>& mem,
                                   std::atomic_bool& running,
-                                  Eu4Date& find_date,
+                                  const Eu4Date& find_date,
                                   std::vector<const uint8_t*>& eu4_date_address,
                                   bool& foundEu4Memloc,
                                   bool& increase_day) {
@@ -95,12 +95,16 @@ void update_current_date(std::unique_ptr<CrossMemory>& mem,
 void get_user_date(Eu4Date& user_date) {
     ImGui::PushItemWidth(100);
     auto [temp_day, temp_month, temp_year] = user_date.get_date();
-
-    ImGui::InputScalar("##eu4 day", ImGuiDataType_U8, &temp_day, &U8_1STEP);
+    auto temp_day_cpy                      = temp_day;
+    ImGui::InputScalar("##eu4 day", ImGuiDataType_U8, &temp_day_cpy, &U8_1STEP);
+    // Only change after an edit
+    if (ImGui::IsItemDeactivatedAfterEdit()) {
+        temp_day = temp_day_cpy;
+    }
     ImGui::SameLine();
     if (ImGui::BeginCombo("##eu4 month", MONTH_NAME[temp_month - 1].data(), 0)) {
         for (int i = 0; i < MONTH_NAME.size(); i++) {
-            bool is_selected = (user_date.get_date().month == i + 1);
+            bool is_selected = (temp_month == i + 1);
             if (ImGui::Selectable(MONTH_NAME[i].data(), is_selected)) {
                 temp_month = i + 1;
             }
