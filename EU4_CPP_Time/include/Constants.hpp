@@ -1,6 +1,7 @@
 #pragma once
 #include <array>
 #include <string_view>
+#include <thread>
 
 constexpr std::string_view GLSL_VERSION = "#version 130";
 
@@ -21,6 +22,7 @@ constexpr std::array<std::string_view, 12> MONTH_NAME = {"1:January",
                                                          "11:November",
                                                          "12:December"};
 
+// Max concurrent thread -2 because (worker thread + current thread)
 const uint32_t MAX_THREADS = std::thread::hardware_concurrency() * 2 - 2;
 
 constexpr size_t MAX_NOTIFY_MSG = 200;

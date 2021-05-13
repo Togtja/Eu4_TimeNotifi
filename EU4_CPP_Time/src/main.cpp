@@ -34,14 +34,11 @@ int main(int argc, char* argv[]) {
         return 1;
 
     // GL 3.0 + GLSL 130
-
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // 3.0+ only
-    // glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);  // 3.2+ only
 
     // Create window with graphics context
-
     GLFWwindow* window = glfwCreateWindow(WINDOWS_SIZE.x, WINDOWS_SIZE.y, "EU4 Time notification", NULL, NULL);
     if (window == NULL)
         return 1;
@@ -49,6 +46,7 @@ int main(int argc, char* argv[]) {
     glfwSwapInterval(1); // Enable vsync
 
     NotificationSound sound("Resources/Audio/quest_complete.wav");
+    std::atomic_bool play_sound = false;
 
     if (gladLoadGL() == 0) {
         spdlog::log(spdlog::level::critical, "Failed to initialize OpenGL loader!");
@@ -63,14 +61,12 @@ int main(int argc, char* argv[]) {
 
     // Setup Dear ImGui style
     ImGui::StyleColorsDark();
-    // ImGui::StyleColorsClassic();
 
     // Setup Platform/Renderer backends
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(GLSL_VERSION.data());
 
     // Load texture
-
     std::array<EU4_Image, IMAGES_PATH.size()> images;
     for (size_t i = 0; i < IMAGES_PATH.size(); i++) {
         if (!load_texture(IMAGES_PATH[i].data(), images[i])) {
@@ -78,9 +74,6 @@ int main(int argc, char* argv[]) {
             return 1;
         }
     }
-
-    std::atomic_bool play_sound  = false;
-    std::atomic_bool exit_worker = false;
 
     // Pointer to a memory class, that include some nice memory functions
     std::unique_ptr<CrossMemory> mem = nullptr;
@@ -91,19 +84,17 @@ int main(int argc, char* argv[]) {
 
     std::vector<Eu4_Notification> notify_dates{};
 
-    // Max concurrent thread -2 because (worker thread + current thread)
-
     uint32_t nr_threads = MAX_THREADS;
     std::thread worker_thread;
-    std::atomic_bool running = false;
+    std::atomic_bool running     = false;
+    std::atomic_bool exit_worker = false;
 
     // Display notification popup
-    bool display_notification_popup = false;
     std::vector<std::string> popup_msg{};
 
     // The notification date (i.e user set date)
-    Eu4Date eu4date(11, 11, 1444);
-
+    Eu4Date user_date(11, 11, 1444);
+    std::string eu4exe{"eu4.exe"};
     // Main loop
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
@@ -125,11 +116,11 @@ int main(int argc, char* argv[]) {
             ImGui::Text("Look Above a perfectly fine photo, but below it get scuffed");
             ImGui::Image((void*)&images[0].texture, ImVec2(images[0].width, images[0].height));
 
+            // Current date is always gotten each loop
             Eu4Date current_date(11, 11, 1444); // SO it beginns
 
             // Find the eu4 Date:
             if (!foundEu4Memloc) {
-                static std::string eu4exe{"eu4.exe"};
                 if (!increase_day) {
                     ImGui::Text("Eu4 excecutable name (typically eu4.exe):");
                     ImGui::InputText("##eu4 exe", &eu4exe);
@@ -138,11 +129,14 @@ int main(int argc, char* argv[]) {
                 else {
                     ImGui::Text("Enter a different EU4 Date:");
                 }
-                get_user_date(eu4date);
+
+                get_user_date(user_date);
+                current_date = user_date;
+
                 if (running) {
                     ImGui::Text("Working on finding the date in the game");
                 }
-                if (!running && ImGui::Button("Submit", {200, 20})) {
+                else if (!running && ImGui::Button("Submit", {200, 20})) {
                     if (!mem) {
                         create_memory_class_for_eu4(mem, eu4exe);
                     }
@@ -152,12 +146,11 @@ int main(int argc, char* argv[]) {
                                                      nr_threads,
                                                      mem,
                                                      running,
-                                                     eu4date,
+                                                     user_date,
                                                      eu4_date_address,
                                                      foundEu4Memloc,
                                                      increase_day);
                     }
-                    current_date = eu4date;
                 }
             }
             else {
@@ -166,6 +159,7 @@ int main(int argc, char* argv[]) {
                     if (worker_thread.joinable()) {
                         worker_thread.join();
                     }
+                    // The worker thread will now always run, until someone say exit, then remember to set the running to false
                     running = true;
                     worker_thread =
                         std::thread(sound_player_thread, std::ref(sound), std::ref(play_sound), std::ref(exit_worker));
@@ -175,7 +169,7 @@ int main(int argc, char* argv[]) {
             display_current_date(current_date);
 
             if (foundEu4Memloc) {
-                add_notification(notify_dates, eu4date, current_date);
+                add_notification(notify_dates, user_date, current_date);
             }
 
             manage_notifications(notify_dates, popup_msg, current_date, play_sound);
@@ -196,7 +190,6 @@ int main(int argc, char* argv[]) {
 
         glfwSwapBuffers(window);
     }
-    exit_worker = true;
 
     // Cleanup
     ImGui_ImplOpenGL3_Shutdown();
@@ -205,6 +198,9 @@ int main(int argc, char* argv[]) {
 
     glfwDestroyWindow(window);
     glfwTerminate();
+
+    // Join the sound playing worker thread
+    exit_worker = true;
     if (worker_thread.joinable()) {
         worker_thread.join();
     }
