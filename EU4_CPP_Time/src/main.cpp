@@ -5,89 +5,25 @@
 #include <chrono>
 #include <filesystem>
 #include <memory>
-#include <string>
 #include <string_view>
 #include <thread>
 #include <unordered_map>
 #include <vector>
 
-#define SAIL_BUILD 1
 #define STB_IMAGE_IMPLEMENTATION
 // External Libraries
 #include <ImGui/imgui_impl_glfw.h>
 #include <ImGui/imgui_impl_opengl3.h>
 #include <ImGui/imgui_internal.h>
 #include <ImGui/imgui_stdlib.h>
-#include <glad/glad.h>
 
-
-#include <spdlog/spdlog.h>
 #include <stb/stb_image.h>
 
-// Need to include glfe3 after glad + imgui
-#include <GLFW/glfw3.h>
-
 // Own Libaries
+#include "Constants.hpp"
 #include "CrossMemory.hpp"
-#include "Eu4Date.hpp"
 #include "NotificationSound.hpp"
-
-static void glfw_error_callback(int error, const char* description) {
-    spdlog::log(spdlog::level::critical, "GLFW Error {}: {}", error, description);
-}
-
-struct eu4noti_image {
-    GLuint texture;
-    int width;
-    int height;
-};
-
-bool load_texture(std::string image_file, eu4noti_image& image) {
-    if (!std::filesystem::exists(image_file)) {
-        return false;
-    }
-    // Load from file
-    int image_width  = 0;
-    int image_height = 0;
-    int comp;
-    unsigned char* image_data = stbi_load(image_file.c_str(), &image_width, &image_height, &comp, STBI_rgb_alpha);
-    if (image_data == NULL)
-        return false;
-
-    // Create a OpenGL texture identifier
-    GLuint image_texture;
-    glGenTextures(1, &image_texture);
-    glBindTexture(GL_TEXTURE_2D, image_texture);
-
-    // Setup filtering parameters for display
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D,
-                    GL_TEXTURE_WRAP_S,
-                    GL_CLAMP_TO_EDGE); // This is required on WebGL for non power-of-two textures
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); // Same
-
-    // Upload pixels into texture
-#if defined(GL_UNPACK_ROW_LENGTH) && !defined(__EMSCRIPTEN__)
-    glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-#endif
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image_width, image_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image_data);
-    stbi_image_free(image_data);
-
-    image.texture = image_texture;
-    image.width   = image_width;
-    image.height  = image_height;
-
-    return true;
-}
-
-struct Eu4_Notification {
-    Eu4Date date;
-    std::string message{};
-    uint32_t repeat      = 1;
-    uint32_t repeat_days = 0;
-    bool operator==(const Eu4_Notification& rhs) { return date == rhs.date && message == rhs.message && repeat == rhs.repeat; }
-};
+#include "Utility.hpp"
 
 // TODO: Move a lot into functions / classes
 int main(int argc, char* argv[]) {
@@ -98,15 +34,15 @@ int main(int argc, char* argv[]) {
         return 1;
 
     // GL 3.0 + GLSL 130
-    const std::string glsl_version = "#version 130";
+
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // 3.0+ only
     // glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);  // 3.2+ only
 
     // Create window with graphics context
-    ImVec2 window_size{700, 700};
-    GLFWwindow* window = glfwCreateWindow(window_size.x, window_size.y, "EU4 Time notification", NULL, NULL);
+
+    GLFWwindow* window = glfwCreateWindow(WINDOWS_SIZE.x, WINDOWS_SIZE.y, "EU4 Time notification", NULL, NULL);
     if (window == NULL)
         return 1;
     glfwMakeContextCurrent(window);
@@ -114,8 +50,7 @@ int main(int argc, char* argv[]) {
 
     NotificationSound sound("Resources/Audio/quest_complete.wav");
 
-    bool err = gladLoadGL() == 0;
-    if (err) {
+    if (gladLoadGL() == 0) {
         spdlog::log(spdlog::level::critical, "Failed to initialize OpenGL loader!");
         return 1;
     }
@@ -132,32 +67,22 @@ int main(int argc, char* argv[]) {
 
     // Setup Platform/Renderer backends
     ImGui_ImplGlfw_InitForOpenGL(window, true);
-    ImGui_ImplOpenGL3_Init(glsl_version.c_str());
+    ImGui_ImplOpenGL3_Init(GLSL_VERSION.data());
 
     // Load texture
-    eu4noti_image image;
-    if (!load_texture("Resources/Images/settings.png", image)) {
-        spdlog::critical("Failed to load setting image");
-        return 1;
+
+    std::array<EU4_Image, IMAGES_PATH.size()> images;
+    for (size_t i = 0; i < IMAGES_PATH.size(); i++) {
+        if (!load_texture(IMAGES_PATH[i].data(), images[i])) {
+            spdlog::critical("Failed to load {}", IMAGES_PATH[i].data());
+            return 1;
+        }
     }
 
     // Our state
     bool show_demo_window = true;
-    // Background color
-    const ImVec4 clear_color                              = ImVec4(0.65f, 0.55f, 0.60f, 1.00f);
-    constexpr std::array<std::string_view, 12> month_name = {"1:January",
-                                                             "2:February",
-                                                             "3:March",
-                                                             "4:April",
-                                                             "5:May",
-                                                             "6:June",
-                                                             "7:July",
-                                                             "8:August",
-                                                             "9:September",
-                                                             "10:October",
-                                                             "11:November",
-                                                             "12:December"};
-    std::string current_month{month_name[10]};
+
+    std::string current_month{MONTH_NAME[10]};
     bool foundEu4Memloc = false;
     bool increase_day   = false;
 
@@ -171,17 +96,17 @@ int main(int argc, char* argv[]) {
     std::vector<Eu4_Notification> notify_dates{};
 
     // Max concurrent thread -2 because (worker thread + current thread)
-    const uint32_t MAX_THREADS = std::thread::hardware_concurrency() * 2 - 2;
-    uint32_t nr_threads        = MAX_THREADS;
+
+    uint32_t nr_threads = MAX_THREADS;
     std::thread worker_thread;
     std::atomic_bool running = false;
 
     // Display notification popup
     bool display_notification_popup = false;
     std::vector<std::string> popup_msg{};
-    constexpr size_t MAX_NOTIFY_MSG = 200;
 
-    static int n_day{11}, n_month{11}, n_year{1444};
+    // The notification date (i.e user set date)
+    Eu4Date eu4date(11, 11, 1444);
 
     // Main loop
     while (!glfwWindowShouldClose(window)) {
@@ -192,26 +117,21 @@ int main(int argc, char* argv[]) {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        // 2. Show a simple window that we create ourselves. We use a Begin/End pair to created a named window.
         {
-            static float f     = 0.0f;
-            static int counter = 0;
             ImGui::SetNextWindowPos({0, 0});
-            ImGui::SetNextWindowSize(window_size);
+            ImGui::SetNextWindowSize(WINDOWS_SIZE);
             ImGui::Begin("Hello, world!",
                          0,
                          ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoFocusOnAppearing |
-                             ImGuiWindowFlags_NoBackground |
-                             ImGuiWindowFlags_NoDecoration); // Create a window called "Hello, world!" and append into it.
-            ImGui::Image((void*)&image.texture, ImVec2(image.width, image.height));
-            int c_day{11}, c_month{11}, c_year{1444};
+                             ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoDecoration);
 
-            Eu4Date eu4date(n_day, n_month, n_year);
-            auto notiDateStruct = eu4date.get_date();
-            n_day               = notiDateStruct.day;
-            n_month             = notiDateStruct.month;
-            current_month       = month_name[n_month - 1];
-            n_year              = notiDateStruct.year;
+            ImGui::Image((void*)&images[0].texture, ImVec2(images[0].width, images[0].height));
+            ImGui::Text("Look Above a perfectly fine photo, but below it get scuffed");
+            ImGui::Image((void*)&images[0].texture, ImVec2(images[0].width, images[0].height));
+
+            Eu4Date current_date(11, 11, 1444); // SO it beginns
+
+            current_month = MONTH_NAME[eu4date.get_date().month - 1];
 
             // Find the eu4 Date:
             if (!foundEu4Memloc) {
@@ -226,14 +146,16 @@ int main(int argc, char* argv[]) {
                 }
 
                 ImGui::PushItemWidth(100);
-                ImGui::InputInt("##eu4 day", &n_day);
+                auto [temp_day, temp_month, temp_year] = eu4date.get_date();
+
+                ImGui::InputScalar("##eu4 day", ImGuiDataType_U8, &temp_day, &U8_1STEP);
                 ImGui::SameLine();
                 if (ImGui::BeginCombo("##eu4 month", current_month.c_str(), 0)) {
-                    for (int i = 0; i < month_name.size(); i++) {
-                        bool is_selected = (n_month == i + 1);
-                        if (ImGui::Selectable(month_name[i].data(), is_selected)) {
-                            current_month = month_name[i];
-                            n_month       = i + 1;
+                    for (int i = 0; i < MONTH_NAME.size(); i++) {
+                        bool is_selected = (eu4date.get_date().month == i + 1);
+                        if (ImGui::Selectable(MONTH_NAME[i].data(), is_selected)) {
+                            current_month = MONTH_NAME[i];
+                            temp_month    = i + 1;
                         }
                         if (is_selected) {
                             ImGui::SetItemDefaultFocus();
@@ -242,18 +164,11 @@ int main(int argc, char* argv[]) {
                     ImGui::EndCombo();
                 }
                 ImGui::SameLine();
-                ImGui::InputInt("##eu4 year", &n_year);
+                ImGui::InputScalar("##eu4 year", ImGuiDataType_U16, &temp_year, &U16_1STEP);
+
+                eu4date.set_date({temp_day, temp_month, temp_year});
                 if (running) {
                     ImGui::Text("Working on finding the date in the game");
-                }
-                else {
-                    // TODO: Make this apart ofa debug menu
-                    ImGui::Text("How many threads to use for the search:");
-                    ImGui::SameLine();
-                    ImGui::InputScalar("##thread count", ImGuiDataType_U32, &nr_threads);
-                    if (nr_threads > MAX_THREADS) {
-                        nr_threads = MAX_THREADS;
-                    }
                 }
                 if (!running && ImGui::Button("Submit", {200, 20})) {
                     if (worker_thread.joinable()) {
@@ -294,19 +209,13 @@ int main(int argc, char* argv[]) {
                             });
                     }
                 }
-                c_day   = n_day;
-                c_month = n_month;
-                c_year  = n_year;
+                current_date = eu4date;
             }
             else {
                 uint32_t eu4_date_read{};
                 mem->bytes_to_T(eu4_date_address.front(), eu4_date_read);
-                Eu4Date cur_date(eu4_date_read);
-                const auto& [_day, _month, _year] = cur_date.get_date();
-                c_day                             = _day;
-                c_month                           = _month;
-                current_month                     = month_name[_month - 1];
-                c_year                            = _year;
+                current_date  = Eu4Date(eu4_date_read);
+                current_month = MONTH_NAME[current_date.get_date().month - 1];
 
                 if (!running) {
                     if (worker_thread.joinable()) {
@@ -328,35 +237,39 @@ int main(int argc, char* argv[]) {
             }
 
             // Displays the current date
-            // If anyone read this: help me not use readonly inoput and a fake combo list, but keep the theme/aesthetic the the
+            // If anyone read this: help me not use readonly input and a fake combo list, but keep the theme/aesthetic the the
             // input does
 
             ImGui::Text("Current Eu4 Date"); // Display some text (you can use a format strings too)
             ImGui::PushItemWidth(100);
 
-            ImGui::InputInt("##eu4 current day", &c_day, 0, ImGuiInputTextFlags_ReadOnly);
+            auto [temp_day, temp_month, temp_year] = eu4date.get_date();
+            ImGui::InputScalar("##eu4 current day", ImGuiDataType_U8, &temp_day, 0, 0, 0, ImGuiInputTextFlags_ReadOnly);
             ImGui::SameLine();
             if (ImGui::BeginCombo("##eu4 current month", current_month.c_str(), ImGuiComboFlags_NoArrowButton)) {
-                for (int i = 0; i < month_name.size(); i++) {
-                    if (c_month == i + 1) {
+                for (int i = 0; i < MONTH_NAME.size(); i++) {
+                    if (temp_month == i + 1) {
                         ImGui::SetItemDefaultFocus();
                     }
                 }
                 ImGui::EndCombo();
             }
             ImGui::SameLine();
-            ImGui::InputInt("##eu4 current year", &c_year, 0, ImGuiInputTextFlags_ReadOnly);
+            ImGui::InputScalar("##eu4 current year", ImGuiDataType_U16, &temp_year, 0, 0, 0, ImGuiInputTextFlags_ReadOnly);
+            // Convert it back in
+            current_date.set_date({temp_day, temp_month, temp_year});
 
             if (foundEu4Memloc) {
                 ImGui::Text("Add a notification for a specific date"); // Display some text (you can use a format strings too)
                 ImGui::PushItemWidth(100);
-                ImGui::InputInt("##eu4 notification day", &n_day, 1);
+                auto [temp_day, temp_month, temp_year] = eu4date.get_date();
+                ImGui::InputScalar("##eu4 notification day", ImGuiDataType_U8, &temp_day);
                 ImGui::SameLine();
-                if (ImGui::BeginCombo("##eu4 notification month", month_name[n_month - 1].data())) {
-                    for (int i = 0; i < month_name.size(); i++) {
-                        bool is_selected = (n_month == i + 1);
-                        if (ImGui::Selectable(month_name[i].data(), is_selected)) {
-                            n_month = i + 1;
+                if (ImGui::BeginCombo("##eu4 notification month", MONTH_NAME[temp_month - 1].data())) {
+                    for (int i = 0; i < MONTH_NAME.size(); i++) {
+                        bool is_selected = (temp_month == i + 1);
+                        if (ImGui::Selectable(MONTH_NAME[i].data(), is_selected)) {
+                            temp_month = i + 1;
                         }
                         if (is_selected) {
                             ImGui::SetItemDefaultFocus();
@@ -365,10 +278,12 @@ int main(int argc, char* argv[]) {
                     ImGui::EndCombo();
                 }
                 ImGui::SameLine();
+                ImGui::InputScalar("##eu4 notification year", ImGuiDataType_U16, &temp_year);
+                eu4date.set_date({temp_day, temp_month, temp_year});
+
                 static std::string notify_msg{};
                 static uint32_t notify_repeat      = 1;
                 static uint32_t notify_repeat_days = 0;
-                ImGui::InputInt("##eu4 notification year", &n_year, 1);
                 ImGui::PushItemWidth(200);
                 ImGui::InputText("Notification Message", &notify_msg);
                 if (notify_msg.size() > MAX_NOTIFY_MSG) {
@@ -379,11 +294,8 @@ int main(int argc, char* argv[]) {
                 ImGui::InputScalar("repeat every x days", ImGuiDataType_U32, &notify_repeat_days);
 
                 // Ensure that the date is not before the current date
-                Eu4Date currDate(c_day, c_month, c_year);
-                if (eu4date.get_days() < currDate.get_days()) {
-                    n_day   = c_day;
-                    n_month = c_month;
-                    n_year  = c_year;
+                if (eu4date.get_days() < current_date.get_days()) {
+                    eu4date = current_date;
                 }
 
                 if (ImGui::Button("Submit Notification", {200, 20})) {
@@ -391,67 +303,11 @@ int main(int argc, char* argv[]) {
                     notify_msg = "";
                 }
             }
-            if (!notify_dates.empty()) {
-                // Sort the dates
-                std::sort(notify_dates.begin(), notify_dates.end(), [](const auto& lhs, const auto& rhs) {
-                    return lhs.date.get_days() < rhs.date.get_days();
-                });
-                // Display and purge the gone-by dates
-                auto notify_dates_cpy = notify_dates;
-                for (auto& eu4date : notify_dates_cpy) {
-                    Eu4Date currDate(c_day, c_month, c_year);
-                    if (eu4date.date.get_days() <= currDate.get_days()) {
-                        play_sound = true;
-                        // Remove if is not set to infinite
-                        notify_dates.erase(std::remove(notify_dates.begin(), notify_dates.end(), eu4date), notify_dates.end());
 
-                        // If 0 always repeat
-                        if (eu4date.repeat == 0) {
-                            eu4date.date = Eu4Date(eu4date.date.get_days() + eu4date.repeat_days);
-                            notify_dates.push_back(eu4date);
-                        }
-                        else {
-                            eu4date.repeat--;
-                            // If not 0 after repeat subtraction, then repeat
-                            if (eu4date.repeat > 0) {
-                                eu4date.date = Eu4Date(eu4date.date.get_days() + eu4date.repeat_days);
-                                notify_dates.push_back(eu4date);
-                            }
-                        }
+            manage_notifications(notify_dates, popup_msg, current_date, play_sound);
+            notify_popup(popup_msg);
+            imgui_setting(window, images[0], nr_threads);
 
-                        if (!eu4date.message.empty()) {
-                            popup_msg.push_back(eu4date.message + " (" + eu4date.date.get_date_as_string() + ")");
-                        }
-                    }
-                    // Display the dates here
-                    ImGui::Text(
-                        fmt::format("Notification for: {} ({})", eu4date.message, eu4date.date.get_date_as_string()).c_str());
-                    ImGui::SameLine();
-                    if (ImGui::Button("X", {15, 15})) {
-                        notify_dates.erase(std::remove(notify_dates.begin(), notify_dates.end(), eu4date), notify_dates.end());
-                    }
-                }
-            }
-
-            if (ImGui::IsWindowFocused() && !popup_msg.empty()) {
-                ImGui::OpenPopup("Notification Popup");
-                ImVec2 windows_center = {window_size.x / 2, window_size.y / 2};
-                ImGui::SetNextWindowPos(windows_center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-            }
-            if (ImGui::BeginPopup("Notification Popup")) {
-                for (auto&& msg : popup_msg) {
-                    ImGui::Text(msg.c_str());
-                }
-                if (ImGui::Button("Ok", {200, 20})) {
-                    ImGui::CloseCurrentPopup();
-                    popup_msg.clear();
-                }
-
-                ImGui::EndPopup();
-            }
-            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
-                        1000.0f / ImGui::GetIO().Framerate,
-                        ImGui::GetIO().Framerate);
             ImGui::End();
         }
 
@@ -460,7 +316,7 @@ int main(int argc, char* argv[]) {
         int display_w, display_h;
         glfwGetFramebufferSize(window, &display_w, &display_h);
         glViewport(0, 0, display_w, display_h);
-        glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
+        glClearColor(CLEAR_COLOR.x * CLEAR_COLOR.w, CLEAR_COLOR.y * CLEAR_COLOR.w, CLEAR_COLOR.z * CLEAR_COLOR.w, CLEAR_COLOR.w);
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
