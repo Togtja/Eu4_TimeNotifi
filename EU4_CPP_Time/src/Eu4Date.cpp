@@ -1,17 +1,17 @@
 #include "Eu4Date.hpp"
 
 void Eu4Date::eu4days_to_eu4date() {
-    m_year = m_days / 365;
-    m_days -= m_year * 365;
+    m_year    = m_days / 365;
+    auto days = m_days - m_year * 365;
 
     uint8_t month{0};
-    for (; month < months_days.size() && m_days >= months_days[month]; month++) {
-        m_days -= months_days[month];
+    for (; month < months_days.size() && days >= months_days[month]; month++) {
+        days -= months_days[month];
     }
     month++; // Add 1 month as it stats on 0
     m_month = month;
-    if (m_days + 1 < std::numeric_limits<uint8_t>::max()) {
-        m_day = static_cast<uint8_t>(m_days + 1);
+    if (days + 1 < std::numeric_limits<uint8_t>::max()) {
+        m_day = static_cast<uint8_t>(days + 1);
     }
     else {
         // TODO: log error
