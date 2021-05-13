@@ -18,7 +18,9 @@ private:
     uint8_t m_month{};
     uint16_t m_year{};
 
-    void eu4days_to_eu4date(uint32_t days);
+    void eu4days_to_eu4date();
+    void eu4date_to_eu4days();
+    // Always call this after a set_x to fix the date
 
 public:
     bool operator==(const Eu4Date& rhs) {
@@ -28,6 +30,7 @@ public:
         return m_days <= rhs.m_days && m_day <= rhs.m_day && m_month <= rhs.m_month && m_year <= rhs.m_year;
     }
     Eu4Date(uint32_t days);
+    Eu4Date(const Eu4DateStruct& date);
     Eu4Date(uint8_t day, uint8_t month, uint16_t year);
     ~Eu4Date();
 
@@ -35,4 +38,28 @@ public:
 
     uint32_t get_days() const { return m_days; }
     Eu4DateStruct get_date() const { return {m_day, m_month, m_year}; }
+
+    void set_days(uint32_t days) {
+        m_days = days;
+        eu4days_to_eu4date();
+    }
+
+    void set_day(uint8_t day) {
+        m_day = day;
+        eu4date_to_eu4days();
+    }
+    void set_month(uint8_t month) {
+        m_month = month;
+        eu4date_to_eu4days();
+    }
+    void set_year(uint16_t year) {
+        m_year = year;
+        eu4date_to_eu4days();
+    }
+    void set_date(const Eu4DateStruct& date) {
+        m_day   = date.day;
+        m_month = date.month;
+        m_year  = date.year;
+        eu4date_to_eu4days();
+    }
 };
