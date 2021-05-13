@@ -29,6 +29,144 @@ static void glfw_error_callback(int error, const char* description) {
     spdlog::log(spdlog::level::critical, "GLFW Error {}: {}", error, description);
 }
 
+void create_memory_class_for_eu4(std::unique_ptr<CrossMemory>& mem, const std::string& eu4exe) {
+    try {
+        mem.reset(new CrossMemory(eu4exe));
+    }
+    catch (const std::exception& e) {
+        if (mem) {
+            mem.reset(nullptr);
+        }
+        spdlog::error(e.what());
+    }
+}
+
+void start_find_eu4date_in_memory(std::thread& thread,
+                                  uint32_t& nr_threads,
+                                  std::unique_ptr<CrossMemory>& mem,
+                                  std::atomic_bool& running,
+                                  Eu4Date& find_date,
+                                  std::vector<const uint8_t*>& eu4_date_address,
+                                  bool& foundEu4Memloc,
+                                  bool& increase_day) {
+    if (thread.joinable()) {
+        thread.join();
+    }
+    thread = std::thread([&mem, &running, &eu4_date_address, &foundEu4Memloc, &increase_day, &nr_threads, find_date]() {
+        running = true;
+        if (mem && !eu4_date_address.empty()) {
+            eu4_date_address = mem->find_byte_from_vector(find_date.get_days(), eu4_date_address);
+        }
+        else if (mem) {
+            spdlog::debug("Scanning memory for {} with {} threads", find_date.get_days(), nr_threads);
+            eu4_date_address = mem->scan_memory(find_date.get_days(), nr_threads);
+        }
+        spdlog::debug("Memory scan returned for {}", eu4_date_address.size());
+        if (mem && eu4_date_address.size() == 1) {
+            foundEu4Memloc = true;
+        }
+        else if (mem) {
+            increase_day = true;
+        }
+
+        running = false;
+    });
+}
+
+void sound_player_thread(NotificationSound& sound, std::atomic_bool& play_sound, std::atomic_bool& exit_thread) {
+    while (!exit_thread) {
+        if (play_sound) {
+            sound.play();
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+            play_sound = false;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+}
+
+void update_current_date(std::unique_ptr<CrossMemory>& mem,
+                         const std::vector<const uint8_t*>& eu4_date_address,
+                         Eu4Date& current_date) {
+    uint32_t eu4_date_read{};
+    mem->bytes_to_T(eu4_date_address.front(), eu4_date_read);
+    current_date = Eu4Date(eu4_date_read);
+}
+
+void get_user_date(Eu4Date& user_date) {
+    ImGui::PushItemWidth(100);
+    auto [temp_day, temp_month, temp_year] = user_date.get_date();
+
+    ImGui::InputScalar("##eu4 day", ImGuiDataType_U8, &temp_day, &U8_1STEP);
+    ImGui::SameLine();
+    if (ImGui::BeginCombo("##eu4 month", MONTH_NAME[temp_month - 1].data(), 0)) {
+        for (int i = 0; i < MONTH_NAME.size(); i++) {
+            bool is_selected = (user_date.get_date().month == i + 1);
+            if (ImGui::Selectable(MONTH_NAME[i].data(), is_selected)) {
+                temp_month = i + 1;
+            }
+            if (is_selected) {
+                ImGui::SetItemDefaultFocus();
+            }
+        }
+        ImGui::EndCombo();
+    }
+    ImGui::SameLine();
+    ImGui::InputScalar("##eu4 year", ImGuiDataType_U16, &temp_year, &U16_1STEP);
+
+    user_date.set_date({temp_day, temp_month, temp_year});
+}
+
+void display_current_date(const Eu4Date& current_date) {
+    // Displays the current date
+    // If anyone read this: help me not use readonly input and a fake combo list, but keep the theme/aesthetic the the
+    // input does
+
+    ImGui::Text("Current Eu4 Date"); // Display some text (you can use a format strings too)
+    ImGui::PushItemWidth(100);
+
+    auto [temp_day, temp_month, temp_year] = current_date.get_date();
+    ImGui::InputScalar("##eu4 current day", ImGuiDataType_U8, &temp_day, 0, 0, 0, ImGuiInputTextFlags_ReadOnly);
+    ImGui::SameLine();
+    if (ImGui::BeginCombo("##eu4 current month", MONTH_NAME[temp_month - 1].data(), ImGuiComboFlags_NoArrowButton)) {
+        for (int i = 0; i < MONTH_NAME.size(); i++) {
+            if (temp_month == i + 1) {
+                ImGui::SetItemDefaultFocus();
+            }
+        }
+        ImGui::EndCombo();
+    }
+    ImGui::SameLine();
+    ImGui::InputScalar("##eu4 current year", ImGuiDataType_U16, &temp_year, 0, 0, 0, ImGuiInputTextFlags_ReadOnly);
+    // Convert it back in
+}
+
+void add_notification(std::vector<Eu4_Notification>& notify_dates, Eu4Date& notify_date, const Eu4Date& current_date) {
+    ImGui::Text("Add a notification for a specific date"); // Display some text (you can use a format strings too)
+    get_user_date(notify_date);
+
+    static std::string notify_msg{};
+    static uint32_t notify_repeat      = 1;
+    static uint32_t notify_repeat_days = 0;
+    ImGui::PushItemWidth(200);
+    ImGui::InputText("Notification Message", &notify_msg);
+    if (notify_msg.size() > MAX_NOTIFY_MSG) {
+        notify_msg.resize(MAX_NOTIFY_MSG);
+    }
+    ImGui::InputScalar("repeat (0 = infinite)", ImGuiDataType_U32, &notify_repeat);
+    // TODO: Make it possible to repeat every x monnth or x years
+    ImGui::InputScalar("repeat every x days", ImGuiDataType_U32, &notify_repeat_days);
+
+    // Ensure that the date is not before the current date
+    if (notify_date.get_days() < current_date.get_days()) {
+        notify_date = current_date;
+    }
+
+    if (ImGui::Button("Submit Notification", {200, 20})) {
+        notify_dates.push_back({notify_date, notify_msg, notify_repeat, notify_repeat_days});
+        notify_msg = "";
+    }
+}
+
 void manage_notifications(std::vector<Eu4_Notification>& notify_dates,
                           std::vector<std::string>& popup_msg,
                           const Eu4Date& currDate,
