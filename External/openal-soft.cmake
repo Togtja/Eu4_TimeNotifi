@@ -1,6 +1,6 @@
-message(STATUS "Could not find libsndfile package so we are getting it from GitHub instead.")
+message(STATUS "Could not find openal-soft package so we are getting it from GitHub instead.")
 
-# Declare where to find spdlog and what version to use
+# Declare where to find openal-soft and what version to use
 FetchContent_Declare(
     openal-soft_external
     GIT_REPOSITORY https://github.com/kcat/openal-soft.git

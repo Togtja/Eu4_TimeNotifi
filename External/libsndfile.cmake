@@ -1,6 +1,6 @@
 message(STATUS "Could not find libsndfile package so we are getting it from GitHub instead.")
 
-# Declare where to find spdlog and what version to use
+# Declare where to find libsndfile and what version to use
 FetchContent_Declare(
     libsndfile_external
     GIT_REPOSITORY https://github.com/libsndfile/libsndfile.git

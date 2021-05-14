@@ -25,7 +25,6 @@
 #include "NotificationSound.hpp"
 #include "Utility.hpp"
 
-// TODO: Move a lot into functions / classes
 int main(int argc, char* argv[]) {
     spdlog::set_level(spdlog::level::debug);
     // Setup window

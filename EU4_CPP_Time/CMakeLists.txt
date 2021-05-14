@@ -35,6 +35,7 @@ add_custom_command(TARGET ${EXEC_NAME} POST_BUILD
         "${PROJECT_SOURCE_DIR}/Resources/"
         $<TARGET_FILE_DIR:${EXEC_NAME}>/Resources/)
 
+#TODO: Attempt to find the Dll Before we copy
 add_custom_command(TARGET ${EXEC_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy
         "${PROJECT_BINARY_DIR}/_deps/openal-soft_external-build/OpenAL32.dll"
