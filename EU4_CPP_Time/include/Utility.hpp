@@ -94,6 +94,7 @@ void update_current_date(std::unique_ptr<CrossMemory>& mem,
 
 void get_user_date(Eu4Date& user_date) {
     ImGui::PushItemWidth(100);
+    user_date.correct_date();
     auto [temp_day, temp_month, temp_year] = user_date.get_date();
     auto temp_day_cpy                      = temp_day;
     ImGui::InputScalar("##eu4 day", ImGuiDataType_U8, &temp_day_cpy, &U8_1STEP);

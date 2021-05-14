@@ -111,9 +111,9 @@ int main(int argc, char* argv[]) {
                          ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoFocusOnAppearing |
                              ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoDecoration);
 
-            ImGui::Image((void*)&images[0].texture, ImVec2(images[0].width, images[0].height));
-            ImGui::Text("Look Above a perfectly fine photo, but below it get scuffed");
-            ImGui::Image((void*)&images[0].texture, ImVec2(images[0].width, images[0].height));
+            // ImGui::Image((void*)&images[0].texture, ImVec2(images[0].width, images[0].height));
+            // ImGui::Text("Look Above a perfectly fine photo, but below it get scuffed");
+            // ImGui::Image((void*)&images[0].texture, ImVec2(images[0].width, images[0].height));
 
             // Current date is always gotten each loop
             Eu4Date current_date(11, 11, 1444); // SO it beginns
@@ -165,6 +165,7 @@ int main(int argc, char* argv[]) {
                 }
             }
 
+            current_date.correct_date();
             display_current_date(current_date);
 
             if (foundEu4Memloc) {

@@ -39,6 +39,8 @@ public:
     Eu4Date(uint8_t day, uint8_t month, uint16_t year);
     ~Eu4Date();
 
+    void correct_date() { eu4date_to_eu4days(); }
+
     std::string get_date_as_string();
 
     uint32_t get_days() const { return m_days; }
