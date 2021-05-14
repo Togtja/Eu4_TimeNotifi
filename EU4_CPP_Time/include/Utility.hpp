@@ -20,8 +20,8 @@ struct EU4_Image {
 struct Eu4_Notification {
     Eu4Date date;
     std::string message{};
-    uint32_t repeat      = 1;
-    uint32_t repeat_days = 0;
+    uint32_t repeat = 1;
+    Eu4DateStruct repeat_date;
     bool operator==(const Eu4_Notification& rhs) { return date == rhs.date && message == rhs.message && repeat == rhs.repeat; }
 };
 
@@ -132,6 +132,7 @@ void display_current_date(const Eu4Date& current_date) {
     auto [temp_day, temp_month, temp_year] = current_date.get_date();
     ImGui::InputScalar("##eu4 current day", ImGuiDataType_U8, &temp_day, 0, 0, 0, ImGuiInputTextFlags_ReadOnly);
     ImGui::SameLine();
+
     if (ImGui::BeginCombo("##eu4 current month", MONTH_NAME[temp_month - 1].data(), ImGuiComboFlags_NoArrowButton)) {
         for (int i = 0; i < MONTH_NAME.size(); i++) {
             if (temp_month == i + 1) {
@@ -145,21 +146,64 @@ void display_current_date(const Eu4Date& current_date) {
     // Convert it back in
 }
 
+void get_repeating_date(Eu4DateStruct& user_date) {
+    ImGui::PushItemWidth(100);
+    auto& [temp_day, temp_month, temp_year] = user_date;
+
+    ImGui::InputScalar("repeat every x days", ImGuiDataType_U8, &temp_day, &U8_1STEP);
+
+    ImGui::InputScalar("repeat every x month", ImGuiDataType_U8, &temp_month, &U8_1STEP);
+
+    ImGui::InputScalar("repeat every x year", ImGuiDataType_U16, &temp_year, &U16_1STEP);
+}
+
+auto get_reapeating(bool clear_repeat = false) {
+    static uint32_t notify_repeat = 1;
+    static Eu4DateStruct notify_repeat_date;
+    if (clear_repeat) {
+        notify_repeat      = 1;
+        notify_repeat_date = Eu4DateStruct();
+        return std::pair{notify_repeat, notify_repeat_date};
+    }
+    if (ImGui::Button("Repeat Notification")) {
+        ImGui::OpenPopup("repeat notify");
+    }
+    if (ImGui::BeginPopupModal("repeat notify")) {
+        ImGui::Text("How often to repeat");
+        get_repeating_date(notify_repeat_date);
+        ImGui::Text("How many times should it be repeater (0 for infinitely)");
+        ImGui::InputScalar("##repeat times", ImGuiDataType_U32, &notify_repeat);
+
+        if (ImGui::Button("Set Repeating")) {
+            ImGui::CloseCurrentPopup();
+        }
+
+        if (ImGui::Button("Cancel")) {
+            notify_repeat      = 1;
+            notify_repeat_date = Eu4DateStruct{};
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::EndPopup();
+    }
+
+    return std::pair{notify_repeat, notify_repeat_date};
+}
+
 void add_notification(std::vector<Eu4_Notification>& notify_dates, Eu4Date& notify_date, const Eu4Date& current_date) {
     ImGui::Text("Add a notification for a specific date"); // Display some text (you can use a format strings too)
     get_user_date(notify_date);
 
     static std::string notify_msg{};
-    static uint32_t notify_repeat      = 1;
-    static uint32_t notify_repeat_days = 0;
     ImGui::PushItemWidth(200);
     ImGui::InputText("Notification Message", &notify_msg);
     if (notify_msg.size() > MAX_NOTIFY_MSG) {
         notify_msg.resize(MAX_NOTIFY_MSG);
     }
-    ImGui::InputScalar("repeat (0 = infinite)", ImGuiDataType_U32, &notify_repeat);
-    // TODO: Make it possible to repeat every x monnth or x years
-    ImGui::InputScalar("repeat every x days", ImGuiDataType_U32, &notify_repeat_days);
+
+    auto [repeat, repeat_date] = get_reapeating();
+
+    spdlog::debug("Repeating {} every {}:{}:{} day/month/year", repeat, repeat_date.day, repeat_date.month, repeat_date.year);
 
     // Ensure that the date is not before the current date
     if (notify_date.get_days() < current_date.get_days()) {
@@ -167,8 +211,9 @@ void add_notification(std::vector<Eu4_Notification>& notify_dates, Eu4Date& noti
     }
 
     if (ImGui::Button("Submit Notification", {200, 20})) {
-        notify_dates.push_back({notify_date, notify_msg, notify_repeat, notify_repeat_days});
+        notify_dates.push_back({notify_date, notify_msg, repeat, repeat_date});
         notify_msg = "";
+        (void)get_reapeating(true); // Clear it for next notification
     }
 }
 
@@ -187,23 +232,28 @@ void manage_notifications(std::vector<Eu4_Notification>& notify_dates,
             play_sound = true;
             // Remove if is not set to infinite
             notify_dates.erase(std::remove(notify_dates.begin(), notify_dates.end(), eu4date), notify_dates.end());
-
+            std::string popup_msg_create{eu4date.message + " (" + eu4date.date.get_date_as_string() + ")"};
             // If 0 always repeat
             if (eu4date.repeat == 0) {
-                eu4date.date = Eu4Date(eu4date.date.get_days() + eu4date.repeat_days);
                 notify_dates.push_back(eu4date);
+                eu4date.date = Eu4Date(eu4date.date.get_date() + eu4date.repeat_date);
+                popup_msg_create += fmt::format(" next notification ({})", eu4date.date.get_date_as_string(), eu4date.repeat);
             }
             else {
                 eu4date.repeat--;
                 // If not 0 after repeat subtraction, then repeat
                 if (eu4date.repeat > 0) {
-                    eu4date.date = Eu4Date(eu4date.date.get_days() + eu4date.repeat_days);
+                    eu4date.date = Eu4Date(eu4date.date.get_date() + eu4date.repeat_date);
                     notify_dates.push_back(eu4date);
+                    eu4date.date = Eu4Date(eu4date.date.get_date() + eu4date.repeat_date);
+                    popup_msg_create += fmt::format(" next notification ({}) repeating {} more times",
+                                                    eu4date.date.get_date_as_string(),
+                                                    eu4date.repeat);
                 }
             }
 
             if (!eu4date.message.empty()) {
-                popup_msg.push_back(eu4date.message + " (" + eu4date.date.get_date_as_string() + ")");
+                popup_msg.push_back(popup_msg_create);
             }
         }
         // Display the dates here
