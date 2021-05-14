@@ -8,6 +8,11 @@ struct Eu4DateStruct {
     uint8_t day{};
     uint8_t month{};
     uint16_t year{};
+    Eu4DateStruct operator+(const Eu4DateStruct& rhs) {
+        return Eu4DateStruct{static_cast<uint8_t>(day + rhs.day),
+                             static_cast<uint8_t>(month + rhs.month),
+                             static_cast<uint16_t>(year + rhs.year)};
+    }
 };
 
 class Eu4Date {
