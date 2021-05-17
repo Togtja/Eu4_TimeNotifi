@@ -285,7 +285,7 @@ void notify_popup(std::vector<std::string>& popup_msg) {
 }
 
 void imgui_setting(GLFWwindow* window, const EU4_Image& setting_icon, uint32_t& nr_threads) {
-    if (ImGui::ImageButton((void*)&setting_icon.texture, ImVec2(setting_icon.width, setting_icon.height))) {
+    if (ImGui::ImageButton((void*)(intptr_t)setting_icon.texture, ImVec2(16, 16))) {
         ImGui::OpenPopup("settings");
     }
 

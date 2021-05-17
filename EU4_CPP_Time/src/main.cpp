@@ -111,10 +111,6 @@ int main(int argc, char* argv[]) {
                          ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoFocusOnAppearing |
                              ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoDecoration);
 
-            // ImGui::Image((void*)&images[0].texture, ImVec2(images[0].width, images[0].height));
-            // ImGui::Text("Look Above a perfectly fine photo, but below it get scuffed");
-            // ImGui::Image((void*)&images[0].texture, ImVec2(images[0].width, images[0].height));
-
             // Current date is always gotten each loop
             Eu4Date current_date(11, 11, 1444); // SO it beginns
 
@@ -122,7 +118,10 @@ int main(int argc, char* argv[]) {
             if (!foundEu4Memloc) {
                 if (!increase_day) {
                     ImGui::Text("Eu4 excecutable name (typically eu4.exe):");
+                    ImGui::PushItemWidth(200);
                     ImGui::InputText("##eu4 exe", &eu4exe);
+                    ImGui::SameLine();
+                    imgui_setting(window, images[0], nr_threads);
                     ImGui::Text("Enter the current EU4 Date:");
                 }
                 else {
@@ -174,7 +173,6 @@ int main(int argc, char* argv[]) {
 
             manage_notifications(notify_dates, popup_msg, current_date, play_sound);
             notify_popup(popup_msg);
-            imgui_setting(window, images[0], nr_threads);
 
             ImGui::End();
         }
