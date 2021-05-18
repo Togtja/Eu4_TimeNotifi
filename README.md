@@ -26,4 +26,3 @@ TODO: Write how to build, is is hopefully very simple, with cmake
 
 - [ ] Write this read me
 - [ ] Spend some time improving the UI
-- [ ] Move the Templates to `CrossMem`
