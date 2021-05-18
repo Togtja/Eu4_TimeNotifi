@@ -25,5 +25,5 @@ TODO: Write how to build, is is hopefully very simple, with cmake
 ## Todo/Missing features
 
 - [ ] Write this read me
-- [ ] Load Images to I can have icon in the application
 - [ ] Spend some time improving the UI
+- [ ] Move the Templates to `CrossMem`
