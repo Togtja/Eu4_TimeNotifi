@@ -1,5 +1,6 @@
 #include <NotificationSound.hpp>
 
+#include <climits>
 #include <filesystem>
 NotificationSound::NotificationSound(const std::string& filename) {
     // Init devices
