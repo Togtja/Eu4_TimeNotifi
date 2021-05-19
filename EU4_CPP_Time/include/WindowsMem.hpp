@@ -1,13 +1,12 @@
 #pragma once
 // C++ Standard library
-#include <algorithm>   //std::find
-#include <chrono>      //std::chrono
-#include <mutex>       //std::lockgyard, std::mutex
-#include <queue>       //std::queue
-#include <string>      //std::string
-#include <thread>      //std::thread
-#include <type_traits> //std::is_same_v
-#include <vector>      //std::vector
+#include <algorithm> //std::find
+#include <chrono>    //std::chrono
+#include <mutex>     //std::lockgyard, std::mutex
+#include <queue>     //std::queue
+#include <string>    //std::string
+#include <thread>    //std::thread
+#include <vector>    //std::vector
 
 // External Libaries
 #include <spdlog/spdlog.h>
