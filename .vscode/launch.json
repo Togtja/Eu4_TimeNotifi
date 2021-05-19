@@ -5,6 +5,15 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Eu4_Unix_timenotifi",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${command:cmake.launchTargetPath}",
+            "cwd": "${workspaceRoot}",
+            "stopAtEntry": false,
+            "environment": []
+        },
+        {
             "name": "Eu4_timenotifi",
             "type": "cppvsdbg",
             "request": "launch",
