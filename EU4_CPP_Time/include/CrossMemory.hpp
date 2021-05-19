@@ -3,11 +3,13 @@
 #ifdef _WIN32
 #    include "WindowsMem.hpp"
 #else
+#    include "UnixMem.hpp"
 #endif
 
 #include <memory>
 #include <string>
 #include <type_traits> //std::is_same_v
+#include <vector>
 
 class CrossMemory {
 private:
@@ -15,6 +17,7 @@ private:
 #ifdef _WIN32
     std::unique_ptr<WindowsMem> mem = nullptr;
 #else
+    std::unique_ptr<UnixMem> mem = nullptr;
 #endif
     template<class T>
     std::vector<uint8_t> to_byte_vector(const T& find) {
@@ -23,7 +26,7 @@ private:
         }
         else {
             const uint8_t* data = static_cast<const uint8_t*>(static_cast<const void*>(&find));
-            return              = std::vector<uint8_t>(data, data + sizeof(find));
+            return std::vector<uint8_t>(data, data + sizeof(find));
         }
     }
 
@@ -62,7 +65,11 @@ public:
 };
 
 CrossMemory::CrossMemory(const std::string& exec_name) : m_exec_name(exec_name) {
+#ifdef _WIN32
     mem.reset(new WindowsMem(exec_name));
+#else
+    mem.reset(new UnixMem(exec_name));
+#endif
 }
 
 CrossMemory::~CrossMemory() {}
