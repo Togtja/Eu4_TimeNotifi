@@ -5,7 +5,7 @@
 #include <glad/glad.h>
 #include <spdlog/spdlog.h>
 
-// Need to include glfe3 after glad + imgui
+// Need to include glfw3 after glad + imgui
 #include <GLFW/glfw3.h>
 
 #include "Constants.hpp"
@@ -202,8 +202,6 @@ void add_notification(std::vector<Eu4_Notification>& notify_dates, Eu4Date& noti
     }
 
     auto [repeat, repeat_date] = get_reapeating();
-
-    spdlog::debug("Repeating {} every {}:{}:{} day/month/year", repeat, repeat_date.day, repeat_date.month, repeat_date.year);
 
     // Ensure that the date is not before the current date
     if (notify_date.get_days() < current_date.get_days()) {
