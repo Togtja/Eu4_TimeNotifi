@@ -3,10 +3,10 @@ target_sources(
     PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/Constants.hpp
     ${CMAKE_CURRENT_LIST_DIR}/Eu4Date.hpp
-    $<$<PLATFORM_ID:WIN32>:${CMAKE_CURRENT_LIST_DIR}/WindowsMem.hpp>
+    $<$<PLATFORM_ID:Windows>:${CMAKE_CURRENT_LIST_DIR}/WindowsMem.hpp>
     $<$<PLATFORM_ID:UNIX>:${CMAKE_CURRENT_LIST_DIR}/UnixMem.hpp>
     ${CMAKE_CURRENT_LIST_DIR}/CrossMemory.hpp
     ${CMAKE_CURRENT_LIST_DIR}/NotificationSound.hpp
     ${CMAKE_CURRENT_LIST_DIR}/Utility.hpp
-    $<$<PLATFORM_ID:WIN32>:${CMAKE_CURRENT_LIST_DIR}/DllInjector.hpp>
+    $<$<PLATFORM_ID:Windows>:${CMAKE_CURRENT_LIST_DIR}/DllInjector.hpp>
 )

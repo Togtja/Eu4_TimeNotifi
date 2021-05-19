@@ -58,8 +58,6 @@ public:
         return mem->find_byte_from_vector(to_byte_vector(find), vector);
     }
 
-    // void scan_inject(int find, bool new_run) { return mem->scan_inject(find, new_run); }
-
     CrossMemory(const std::string& exec_name);
     ~CrossMemory();
 };

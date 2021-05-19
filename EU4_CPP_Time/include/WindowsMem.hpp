@@ -86,6 +86,4 @@ public:
     std::vector<const uint8_t*> scan_memory(uint8_t* address_low, uint8_t* address_high, const std::vector<uint8_t>& byte_check);
 
     std::vector<const uint8_t*> scan_memory(const std::vector<uint8_t>& byte_check, const uint32_t nr_threads);
-
-    // void scan_inject(int find, bool new_run) { m_dll_inject.inject(find, new_run); }
 };
