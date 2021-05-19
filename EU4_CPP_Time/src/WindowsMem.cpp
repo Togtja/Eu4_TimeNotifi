@@ -41,14 +41,9 @@ std::vector<const uint8_t*> WindowsMem::find_byte_from_vector(const std::vector<
                                                               const std::vector<const uint8_t*>& vector) {
     std::vector<const uint8_t*> out;
     for (auto k : vector) {
-        std::vector<uint8_t> mem_chunk;
-
-        mem_chunk.resize(byte_check.size());
-        size_t read;
-        if (ReadProcessMemory(m_proc, k, mem_chunk.data(), mem_chunk.size(), &read)) {
-            if (mem_chunk == byte_check) {
-                out.push_back(k);
-            }
+        auto mem_chunk read_address(k, byte_check.size());
+        if (mem_chunk == byte_check) {
+            out.push_back(k);
         }
     }
     return out;
