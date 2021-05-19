@@ -31,3 +31,9 @@ ImVec2 WINDOWS_SIZE{700, 700};
 
 uint8_t U8_1STEP   = 1;
 uint16_t U16_1STEP = 1;
+
+#ifdef _WIN32
+constexpr std::string_view DEFAULT_EU4_BIN = "eu4.exe";
+#else
+constexpr std::string_view DEFAULT_EU4_BIN = "eu4";
+#endif

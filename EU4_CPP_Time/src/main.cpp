@@ -93,7 +93,7 @@ int main(int argc, char* argv[]) {
 
     // The notification date (i.e user set date)
     Eu4Date user_date(11, 11, 1444);
-    std::string eu4exe{"eu4.exe"};
+    std::string eu4exe{DEFAULT_EU4_BIN};
     // Main loop
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
