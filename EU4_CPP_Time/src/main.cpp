@@ -46,6 +46,7 @@ int main(int argc, char* argv[]) {
 
     NotificationSound sound("Resources/Audio/quest_complete.wav");
     std::atomic_bool play_sound = false;
+    auto sound_devices          = sound.get_all_devices();
 
     if (gladLoadGL() == 0) {
         spdlog::log(spdlog::level::critical, "Failed to initialize OpenGL loader!");
@@ -174,6 +175,26 @@ int main(int argc, char* argv[]) {
             manage_notifications(notify_dates, popup_msg, current_date, play_sound);
             notify_popup(popup_msg);
 
+            ImGui::PushItemWidth(300);
+
+            static int current_device = 0;
+            if (ImGui::BeginCombo("##sound devices", sound_devices[current_device].data(), 0)) {
+                for (int i = 0; i < sound_devices.size(); i++) {
+                    bool is_selected = (current_device == i);
+                    if (ImGui::Selectable(sound_devices[i].data(), is_selected)) {
+                        if (sound.set_device(sound_devices[i])) {
+                            spdlog::debug("Test");
+                            current_device = i;
+                            spdlog::debug("PLAY SOUND");
+                            sound.play();
+                        }
+                    }
+                    if (is_selected) {
+                        ImGui::SetItemDefaultFocus();
+                    }
+                }
+                ImGui::EndCombo();
+            }
             ImGui::End();
         }
 
