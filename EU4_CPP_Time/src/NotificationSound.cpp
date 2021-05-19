@@ -2,12 +2,9 @@
 
 #include <climits>
 #include <filesystem>
-NotificationSound::NotificationSound(const std::string& filename) {
+
+void NotificationSound::init() {
     // Init devices
-    m_device = alcOpenDevice(nullptr);
-    if (!m_device) {
-        throw std::runtime_error("failed to get sound device");
-    }
 
     m_context = alcCreateContext(m_device, nullptr);
     if (!m_context) {
@@ -24,21 +21,21 @@ NotificationSound::NotificationSound(const std::string& filename) {
         m_device_name = alcGetString(m_device, ALC_DEVICE_SPECIFIER);
 
     // Load sound file and Init sound buffer
-    if (!std::filesystem::exists(filename)) {
-        throw std::runtime_error("failed: file " + filename + " does not exist");
+    if (!std::filesystem::exists(m_filename)) {
+        throw std::runtime_error("failed: file " + m_filename + " does not exist");
     }
 
     SF_INFO sfinfo;
-    sfinfo.format    = SF_FORMAT_OGG;
-    SNDFILE* sndfile = sf_open(std::filesystem::absolute(filename).string().c_str(), SFM_READ, &sfinfo);
+    sfinfo.format    = SF_FORMAT_WAV;
+    SNDFILE* sndfile = sf_open(std::filesystem::absolute(m_filename).string().c_str(), SFM_READ, &sfinfo);
     if (!sndfile) {
         auto err  = sf_error(sndfile);
         auto errS = sf_error_number(err);
-        throw std::runtime_error("failed to open " + std::filesystem::absolute(filename).string() + "due to: " + errS);
+        throw std::runtime_error("failed to open " + std::filesystem::absolute(m_filename).string() + "due to: " + errS);
     }
 
     if (sfinfo.frames < 1 || sfinfo.frames > (sf_count_t)(INT_MAX / sizeof(short)) / sfinfo.channels) {
-        throw std::runtime_error("bad sample count in " + filename + "(" + std::to_string(sfinfo.frames) + ")");
+        throw std::runtime_error("bad sample count in " + m_filename + "(" + std::to_string(sfinfo.frames) + ")");
         sf_close(sndfile);
     }
 
@@ -59,7 +56,7 @@ NotificationSound::NotificationSound(const std::string& filename) {
     if (num_frames < 1) {
         delete[] membuff;
         sf_close(sndfile);
-        throw std::runtime_error("failed to read samples in " + filename + "(" + std::to_string(num_frames) + ")");
+        throw std::runtime_error("failed to read samples in " + m_filename + "(" + std::to_string(num_frames) + ")");
     }
     ALsizei num_bytes = static_cast<ALsizei>(num_frames * sfinfo.channels * sizeof(short));
 
@@ -70,11 +67,10 @@ NotificationSound::NotificationSound(const std::string& filename) {
     delete[] membuff;
     sf_close(sndfile);
 
-    auto err          = alGetError();
-    auto err_str      = alGetString(err);
-    const char* err_c = static_cast<const char*>(err_str);
+    auto err     = alGetError();
+    auto err_str = alGetString(err);
     if (!err_str) {
-        throw std::runtime_error("openAL failure: " + std::string(err_c));
+        throw std::runtime_error("openAL failure: " + std::string(static_cast<const char*>(err_str)));
     }
 
     if (err != AL_NO_ERROR) {
@@ -94,14 +90,59 @@ NotificationSound::NotificationSound(const std::string& filename) {
     alSourcei(m_source, AL_BUFFER, m_buffer);
 }
 
-NotificationSound::~NotificationSound() {
+void NotificationSound::deinit() {
     // TODO check succsess
+    alDeleteSources(1, &m_source);
+    alDeleteBuffers(1, &m_buffer);
+
     alcMakeContextCurrent(nullptr);
     alcDestroyContext(m_context);
-    alDeleteSources(1, &m_source);
 
-    alDeleteBuffers(1, &m_buffer);
     alcCloseDevice(m_device);
+}
+
+NotificationSound::NotificationSound(const std::string& filename) : m_filename(filename) {
+    m_device = alcOpenDevice(nullptr);
+    if (!m_device) {
+        throw std::runtime_error("failed to get sound device");
+    }
+    init();
+}
+
+NotificationSound::~NotificationSound() {
+    deinit();
+}
+
+std::vector<std::string> NotificationSound::get_all_devices() {
+    std::vector<std::string> all_devices;
+    auto devices = alcGetString(NULL, ALC_ALL_DEVICES_SPECIFIER);
+    size_t from  = 0;
+    for (size_t i = 0;; i++) {
+        // Single null means end of that device
+        if (devices[i] == '\0') {
+            std::string device_string(devices + from);
+            if (auto temp = alcOpenDevice(device_string.c_str()); temp) {
+                alcCloseDevice(temp);
+                all_devices.emplace_back(device_string);
+            }
+            // Double null means end of all devices
+            if (devices[i + 1] == '\0') {
+                break;
+            }
+            from = i + 1;
+        }
+    }
+    return all_devices;
+}
+
+bool NotificationSound::set_device(const std::string& device) {
+    auto temp_dev = alcOpenDevice(device.c_str());
+    if (!temp_dev) {
+        return false;
+    }
+    deinit();
+    m_device = temp_dev;
+    init();
 }
 
 void NotificationSound::play() {

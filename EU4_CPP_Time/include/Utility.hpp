@@ -346,3 +346,23 @@ bool load_texture(const std::string& image_file, EU4_Image& image) {
 
     return true;
 }
+
+void select_sound_player_widget(NotificationSound& sound, std::vector<std::string>& sound_devices) {
+    ImGui::PushItemWidth(330);
+    static int current_device = 0;
+    if (ImGui::BeginCombo("##sound devices", sound_devices[current_device].data(), 0)) {
+        for (int i = 0; i < sound_devices.size(); i++) {
+            bool is_selected = (current_device == i);
+            if (ImGui::Selectable(sound_devices[i].c_str(), is_selected)) {
+                spdlog::debug("setting device to be: {}", sound_devices[i]);
+                if (sound.set_device(sound_devices[i])) {
+                    current_device = i;
+                }
+            }
+            if (is_selected) {
+                ImGui::SetItemDefaultFocus();
+            }
+        }
+        ImGui::EndCombo();
+    }
+}
