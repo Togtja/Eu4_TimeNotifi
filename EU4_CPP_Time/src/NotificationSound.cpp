@@ -109,6 +109,26 @@ NotificationSound::NotificationSound(const std::string& filename) : m_filename(f
     init();
 }
 
+NotificationSound::NotificationSound(const std::string& filename, const std::string& device) : m_filename(filename) {
+    if (device.empty()) {
+        m_device = alcOpenDevice(nullptr);
+        if (!m_device) {
+            throw std::runtime_error("failed to get sound device");
+        }
+    }
+    else {
+        m_device = alcOpenDevice(device.c_str());
+        if (!m_device) {
+            // Tries default
+            m_device = alcOpenDevice(nullptr);
+            if (!m_device) {
+                throw std::runtime_error("failed to get sound device, tried " + device + " then a default device");
+            }
+        }
+    }
+    init();
+}
+
 NotificationSound::~NotificationSound() {
     deinit();
 }

@@ -39,6 +39,7 @@ private:
 
 public:
     NotificationSound(const std::string& filename);
+    NotificationSound(const std::string& filename, const std::string& device);
     ~NotificationSound();
 
     void play();
@@ -46,6 +47,7 @@ public:
     std::vector<std::string> get_all_devices();
 
     bool set_device(const std::string& device);
+    std::string get_device() { return std::string(m_device_name); }
 
     void set_sound_file(const std::string& filename);
 };
