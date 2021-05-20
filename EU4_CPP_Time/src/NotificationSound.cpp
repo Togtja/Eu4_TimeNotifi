@@ -143,6 +143,7 @@ bool NotificationSound::set_device(const std::string& device) {
     deinit();
     m_device = temp_dev;
     init();
+    return true;
 }
 
 void NotificationSound::play() {
