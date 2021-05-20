@@ -120,11 +120,8 @@ std::vector<std::string> NotificationSound::get_all_devices() {
     for (size_t i = 0;; i++) {
         // Single null means end of that device
         if (devices[i] == '\0') {
-            std::string device_string(devices + from);
-            if (auto temp = alcOpenDevice(device_string.c_str()); temp) {
-                alcCloseDevice(temp);
-                all_devices.emplace_back(device_string);
-            }
+            all_devices.emplace_back(devices + from);
+
             // Double null means end of all devices
             if (devices[i + 1] == '\0') {
                 break;

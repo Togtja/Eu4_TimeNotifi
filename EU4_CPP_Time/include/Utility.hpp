@@ -365,4 +365,12 @@ void select_sound_player_widget(NotificationSound& sound, std::vector<std::strin
         }
         ImGui::EndCombo();
     }
+
+    if (ImGui::Button("Play Sound")) {
+        std::thread([&sound]() { sound.play(); }).detach();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Refresh devices")) {
+        sound_devices = sound.get_all_devices();
+    }
 }
