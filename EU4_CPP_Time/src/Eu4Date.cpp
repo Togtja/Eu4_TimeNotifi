@@ -1,5 +1,7 @@
 #include "Eu4Date.hpp"
 
+#include <limits>
+
 void Eu4Date::eu4days_to_eu4date() {
     m_year    = m_days / 365;
     auto days = m_days - m_year * 365;
