@@ -4,3 +4,7 @@ imgui.ini
 .vs
 out/
 CMakeSettings.json
+settings.txt
+saved_notifications/
+.cache/
+compile_commands.json
