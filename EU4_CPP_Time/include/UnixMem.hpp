@@ -83,7 +83,10 @@ private:
             auto high      = range.substr(range.find("-") + 1);
             auto low_void  = (uint8_t*)std::stoull(low, nullptr, 16);
             auto high_void = (uint8_t*)std::stoull(high, nullptr, 16);
-            out.emplace_back(MemSearch{low_void, high_void});
+            // Some pre-determed knowledge that the eu4date is in the heap
+            if (pathname == "[heap]" && !perms.empty() && perms[0] == 'r') {
+                out.emplace_back(MemSearch{low_void, high_void});
+            }
         }
         return out;
     }
@@ -95,25 +98,23 @@ public:
     std::vector<uint8_t> read_address(const uint8_t* address, size_t size) {
         std::vector<uint8_t> mem_buff(size);
         // Build iovec structs
-        struct iovec local[1];
-        local[0].iov_base = mem_buff.data();
-        local[0].iov_len  = mem_buff.size();
+        struct iovec local;
+        local.iov_base = mem_buff.data();
+        local.iov_len  = mem_buff.size();
 
-        struct iovec remote[1];
-        remote[0].iov_base = (void*)address;
-        remote[0].iov_len  = mem_buff.size();
-        ssize_t nread      = process_vm_readv(m_pid, local, 1, remote, 1, 0);
+        struct iovec remote;
+        remote.iov_base = (void*)address;
+        remote.iov_len  = mem_buff.size();
+        auto nread      = process_vm_readv(m_pid, &local, 1, &remote, 1, 0);
         if (nread < 0) {
             // spdlog::debug("mem at {}", fmt::ptr(remote[0].iov_base));
             switch (errno) {
-                case EINVAL: spdlog::debug("ERROR: INVALID ARGUMENTS"); break;
-                // case EFAULT: std::cout << "ERROR: UNABLE TO ACCESS TARGET MEMORY ADDRESS.\n"; break;
-                case ENOMEM: spdlog::debug("ERROR: UNABLE TO ALLOCATE MEMORY"); break;
-                case EPERM: spdlog::debug("ERROR: INSUFFICIENT PRIVILEGES TO TARGET PROCESS"); break;
-                case ESRCH:
-                    spdlog::debug("ERROR: PROCESS DOES NOT EXIST");
-                    break;
-                    // default: spdlog::debug("ERROR: AN UNKNOWN ERROR HAS OCCURRED");
+                case EINVAL: spdlog::warn("INVALID ARGUMENTS"); break;
+                case EFAULT: spdlog::warn("UNABLE TO ACCESS TARGET MEMORY ADDRESS"); break;
+                case ENOMEM: spdlog::warn("UNABLE TO ALLOCATE MEMORY"); break;
+                case EPERM: spdlog::warn("INSUFFICIENT PRIVILEGES TO TARGET PROCESS"); break;
+                case ESRCH: spdlog::warn("PROCESS DOES NOT EXIST"); break;
+                default: spdlog::warn("ERROR: AN UNKNOWN ERROR HAS OCCURRED");
             }
             return {};
         }
