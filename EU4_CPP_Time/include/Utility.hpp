@@ -1,15 +1,21 @@
 #pragma once
 
+#include <filesystem>
 #include <string>
 
+#include <ImGui/imgui.h>
+#include <ImGui/imgui_stdlib.h>
 #include <glad/glad.h>
 #include <spdlog/spdlog.h>
+#include <stb/stb_image.h>
 
 // Need to include glfw3 after glad + imgui
 #include <GLFW/glfw3.h>
 
 #include "Constants.hpp"
+#include "CrossMemory.hpp"
 #include "Eu4Date.hpp"
+#include "NotificationSound.hpp"
 
 struct EU4_Image {
     GLuint texture;
@@ -54,18 +60,19 @@ void start_find_eu4date_in_memory(std::thread& thread,
     }
     thread = std::thread([&mem, &running, &eu4_date_address, &foundEu4Memloc, &increase_day, &nr_threads, find_date]() {
         running = true;
-        if (mem && !eu4_date_address.empty()) {
+        if (!eu4_date_address.empty()) {
             eu4_date_address = mem->find_byte_from_vector(find_date.get_days(), eu4_date_address);
         }
-        else if (mem) {
+        else {
             spdlog::debug("Scanning memory for {} with {} threads", find_date.get_days(), nr_threads);
             eu4_date_address = mem->scan_memory(find_date.get_days(), nr_threads);
         }
         spdlog::debug("Memory scan returned for {}", eu4_date_address.size());
-        if (mem && eu4_date_address.size() == 1) {
+        if (eu4_date_address.size() == 1) {
+            spdlog::debug("Found Date at memory location: {:p}", (void*)eu4_date_address[0]);
             foundEu4Memloc = true;
         }
-        else if (mem) {
+        else {
             increase_day = true;
         }
 
