@@ -34,6 +34,9 @@ const ImVec2 WINDOWS_SIZE{700, 700};
 constexpr uint8_t U8_1STEP   = 1;
 constexpr uint16_t U16_1STEP = 1;
 
+constexpr std::string_view SETTING_FILE  = "settings.txt";
+constexpr std::string_view NOTIFY_FOLDER = "saved_notifications";
+
 #ifdef _WIN32
 constexpr std::string_view DEFAULT_EU4_BIN = "eu4.exe";
 #else

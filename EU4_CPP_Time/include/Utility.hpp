@@ -354,9 +354,8 @@ bool load_texture(const std::string& image_file, EU4_Image& image) {
     return true;
 }
 
-void select_sound_player_widget(NotificationSound& sound, std::vector<std::string>& sound_devices) {
+void select_sound_player_widget(NotificationSound& sound, std::vector<std::string>& sound_devices, int& current_device) {
     ImGui::PushItemWidth(330);
-    static int current_device = 0;
     if (ImGui::BeginCombo("##sound devices", sound_devices[current_device].data(), 0)) {
         for (int i = 0; i < sound_devices.size(); i++) {
             bool is_selected = (current_device == i);
@@ -378,6 +377,14 @@ void select_sound_player_widget(NotificationSound& sound, std::vector<std::strin
     }
     ImGui::SameLine();
     if (ImGui::Button("Refresh devices")) {
-        sound_devices = sound.get_all_devices();
+        auto temp_dev  = sound_devices[current_device];
+        sound_devices  = sound.get_all_devices();
+        current_device = 0; // Default if failed to get the old device after refresh
+        for (size_t i = 0; i < sound_devices.size(); i++) {
+            if (temp_dev == sound_devices[i]) {
+                current_device = i;
+                break;
+            }
+        }
     }
 }
