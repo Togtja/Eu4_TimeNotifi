@@ -41,11 +41,12 @@ Requires: [CMake](https://cmake.org/download/) and a C++ Compiler (Tested: MSVC 
 Open your favorite terminal/shell, navigate to where you want to the folder have the `Eu4_TimeNotifi folder, then one after the other write the following commands:
 
 ```bash
-git clone https://github.com/Togtja/Eu4_TimeNotifi
-cd Eu4_TimeNotifi/
-mkdir build
-cd build/
-cmake ../
+$ git clone https://github.com/Togtja/Eu4_TimeNotifi
+$ cd Eu4_TimeNotifi/
+$ mkdir build
+$ cd build/
+$ cmake ../
+$ cmake --build .
 ```
 
 ## Dependency Libraries
