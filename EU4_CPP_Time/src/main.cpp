@@ -1,29 +1,32 @@
 // C++ Libraries
 #include <algorithm>
-#include <array>
 #include <atomic>
 #include <chrono>
+#include <filesystem>
 #include <fstream>
-#include <memory>
-#include <string>
-#include <string_view>
 #include <thread>
-#include <unordered_map>
-#include <vector>
 
+// External libraries
 #define STB_IMAGE_IMPLEMENTATION
-// External Libraries
+#include <ImGui/imgui.h>
 #include <ImGui/imgui_impl_glfw.h>
 #include <ImGui/imgui_impl_opengl3.h>
-#include <ImGui/imgui_internal.h>
+#include <ImGui/imgui_stdlib.h>
+#include <glad/glad.h>
+#include <stb/stb_image.h>
+
+// Need to include glfw3 after glad + imgui
+#include <GLFW/glfw3.h>
 
 // Own Libaries
 #include "Constants.hpp"
-#include "CrossMemory.hpp"
-#include "NotificationSound.hpp"
+
 #include "Utility.hpp"
+#include <iostream>
 
 int main(int argc, char* argv[]) {
+    std::cout << "Hello world\n";
+
     spdlog::set_level(spdlog::level::debug);
 
     // Setup window
@@ -200,95 +203,9 @@ int main(int argc, char* argv[]) {
             notify_popup(popup_msg);
             select_sound_player_widget(sound, sound_devices, current_device);
 
-            if (ImGui::Button("Save State")) {
-                std::ofstream settings_file;
-                settings_file.open(SETTING_FILE.data());
-                settings_file << nr_threads << "\n" << sound.get_device();
-                settings_file.close();
-            }
+            save_notification_widget(notify_dates, current_loaded_file);
 
-            if (!notify_dates.empty() && ImGui::Button("Save Notifications")) {
-                ImGui::OpenPopup("Save Noti Popup");
-            }
-
-            if (ImGui::BeginPopup("Save Noti Popup")) {
-                ImGui::Text("Save name for the Notifications:");
-                ImGui::InputText("##file name for notifi", &current_loaded_file);
-                if (!current_loaded_file.empty() && ImGui::Button("Save", {200, 20})) {
-                    std::ofstream notify_file;
-                    notify_file.open("saved_notifications/" + current_loaded_file + ".txt");
-                    notify_file << notify_dates.size() << "\n";
-                    for (auto&& noti_date : notify_dates) {
-                        notify_file << (uint32_t)noti_date.date.get_date().day << " " << (uint32_t)noti_date.date.get_date().month
-                                    << " " << (uint32_t)noti_date.date.get_date().year << " " << (uint32_t)noti_date.repeat << " "
-                                    << (uint32_t)noti_date.repeat_date.day << " " << (uint32_t)noti_date.repeat_date.month << " "
-                                    << (uint32_t)noti_date.repeat_date.year << " " << noti_date.message << "\n";
-                    }
-                    ImGui::CloseCurrentPopup();
-                }
-                ImGui::EndPopup();
-            }
-
-            std::vector<std::string> notify_files{};
-            for (const auto& entry : std::filesystem::recursive_directory_iterator(NOTIFY_FOLDER)) {
-                auto entry_file = entry.path().filename();
-                if (entry_file.extension() == ".txt") {
-                    notify_files.push_back(entry_file.replace_extension("").string());
-                }
-            }
-
-            if (!notify_files.empty() && ImGui::Button("Load Notifications")) {
-                ImGui::OpenPopup("Load Noti Popup");
-            }
-
-            if (ImGui::BeginPopup("Load Noti Popup")) {
-                static int selected_file = 0;
-                if (ImGui::BeginCombo("##notify files", notify_files[selected_file].data(), 0)) {
-                    for (int i = 0; i < notify_files.size(); i++) {
-                        bool is_selected = (current_device == i);
-                        if (ImGui::Selectable(notify_files[i].c_str(), is_selected)) {
-                            selected_file = i;
-                        }
-                        if (is_selected) {
-                            ImGui::SetItemDefaultFocus();
-                        }
-                    }
-                    ImGui::EndCombo();
-                }
-
-                if (ImGui::Button("Load", {200, 20})) {
-                    spdlog::debug("Loading: {}", notify_files[selected_file]);
-                    int amount_of_notify{};
-                    std::ifstream notify_file;
-
-                    notify_file.open(std::string(NOTIFY_FOLDER) + "/" + notify_files[selected_file] + ".txt");
-                    notify_file >> amount_of_notify >> std::ws;
-                    for (size_t i = 0; i < amount_of_notify; i++) {
-                        std::stringstream ss;
-                        std::string line{};
-                        std::getline(notify_file, line);
-                        ss << line;
-                        uint32_t date_day{}, date_month{}, date_year{}, repeat{}, repeat_day{}, repeat_month{}, repeat_year{};
-                        std::string message{};
-
-                        ss >> date_day >> date_month >> date_year >> repeat >> repeat_day >> repeat_month >> repeat_year >>
-                            std::ws;
-                        // Get remainder of ss
-                        std::getline(ss, message);
-
-                        notify_dates.emplace_back(Eu4_Notification{Eu4Date(date_day, date_month, date_year),
-                                                                   message,
-                                                                   repeat,
-                                                                   Eu4DateStruct{static_cast<uint8_t>(repeat_day),
-                                                                                 static_cast<uint8_t>(repeat_month),
-                                                                                 static_cast<uint16_t>(repeat_year)}});
-                    }
-
-                    notify_file.close();
-                    ImGui::CloseCurrentPopup();
-                }
-                ImGui::EndPopup();
-            }
+            // Load widget
 
             ImGui::End();
         } // End Widget
@@ -304,6 +221,12 @@ int main(int argc, char* argv[]) {
 
         glfwSwapBuffers(window);
     }
+
+    // Save settings
+    std::ofstream settings_file;
+    settings_file.open(SETTING_FILE.data());
+    settings_file << nr_threads << "\n" << sound.get_device();
+    settings_file.close();
 
     // Cleanup
     ImGui_ImplOpenGL3_Shutdown();
