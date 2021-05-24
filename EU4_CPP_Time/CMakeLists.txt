@@ -19,8 +19,8 @@ target_link_libraries(
     PRIVATE
     OpenGL::GL
     glfw
-    sndfile
     OpenAL
+    sndfile
     spdlog::spdlog
     glad
 )

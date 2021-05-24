@@ -14,6 +14,7 @@
 class CrossMemory {
 private:
     std::string m_exec_name{};
+
 #ifdef _WIN32
     std::unique_ptr<WindowsMem> mem = nullptr;
 #else
@@ -58,16 +59,13 @@ public:
         return mem->find_byte_from_vector(to_byte_vector(find), vector);
     }
 
-    CrossMemory(const std::string& exec_name);
-    ~CrossMemory();
-};
-
-CrossMemory::CrossMemory(const std::string& exec_name) : m_exec_name(exec_name) {
+public:
+    CrossMemory(const std::string& exec_name) : m_exec_name(exec_name) {
 #ifdef _WIN32
-    mem.reset(new WindowsMem(exec_name));
+        mem.reset(new WindowsMem(exec_name));
 #else
-    mem.reset(new UnixMem(exec_name));
+        mem.reset(new UnixMem(exec_name));
 #endif
-}
-
-CrossMemory::~CrossMemory() {}
+    }
+    ~CrossMemory(){};
+};

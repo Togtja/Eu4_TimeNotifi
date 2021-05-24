@@ -2,7 +2,6 @@
 #include <AL/al.h>
 #include <AL/alc.h>
 #include <sndfile.h>
-
 #include <spdlog/spdlog.h>
 
 #include <string>
@@ -30,7 +29,7 @@ private:
     bool m_loop_sound   = false;
     ALuint m_buffer     = 0;
 
-    // sound file
+    // Sound file
     std::string m_filename{};
 
     void init();
