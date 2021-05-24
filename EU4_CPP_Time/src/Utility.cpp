@@ -216,8 +216,8 @@ void manage_notifications(std::vector<Eu4_Notification>& notify_dates,
             std::string popup_msg_create{eu4date.message + " (" + eu4date.date.get_date_as_string() + ")"};
             // If 0 always repeat
             if (eu4date.repeat == 0) {
-                notify_dates.push_back(eu4date);
                 eu4date.date = Eu4Date(eu4date.date.get_date() + eu4date.repeat_date);
+                notify_dates.push_back(eu4date);
                 popup_msg_create += fmt::format(" next notification ({})", eu4date.date.get_date_as_string(), eu4date.repeat);
             }
             else {
