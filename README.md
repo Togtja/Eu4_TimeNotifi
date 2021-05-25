@@ -10,27 +10,27 @@ I read EU4 memory to find the date in memory. Then keep track of the date, and a
 
 TLDR: Watch this [Quick Guide YouTube Video](https://youtu.be/aycPIAfqn1s )
 
-When you this software, you should be greeted with a screen like this one: 
+When you this software, you should be greeted with a screen like this one:
 
-![](https://i.imgur.com/lLs8hND.png)
+![Welcome Screen](https://i.imgur.com/lLs8hND.png)
 
-Here you have a few options, but to keep it simple, the "submit" button is the only important one. However, we need to start the actual game (Eu4) before I can do anything useful. Once Eu4 is booted, and a save is loaded/started, enter the current date of the game into here: 
+Here you have a few options, but to keep it simple, the "submit" button is the only important one. However, we need to start the actual game (Eu4) before I can do anything useful. Once Eu4 is booted, and a save is loaded/started, enter the current date of the game into here:
 
-![](https://i.imgur.com/TARYF9R.png)
+![Enter Date](https://i.imgur.com/TARYF9R.png)
 
-Then a search of that date will happen, this will take 2-5 seconds depending on your hardware. Once the date has been found, you will most likely be greeted with a message saying "Enter a different EU4 Date:" 
+Then a search of that date will happen, this will take 2-5 seconds depending on your hardware. Once the date has been found, you will most likely be greeted with a message saying "Enter a different EU4 Date:"
 
-![](https://i.imgur.com/FmSXtpr.png)
+![Have Entered 1st Date](https://i.imgur.com/FmSXtpr.png)
 
-If so you should just need to un-pause the game and let the date tick one day, and enter that date into the Eu4-Notifi application ![](https://i.imgur.com/d3r1PEW.png). Once this is done the Eu4-Notifi should look like this: 
+If so you should just need to un-pause the game and let the date tick one day, and enter that date into the Eu4-Notifi application ![Enter 2nd Date](https://i.imgur.com/d3r1PEW.png) Once this is done the Eu4-Notifi should look like this:
 
-![](https://i.imgur.com/4fSHEcc.png)
+![Ready for Notifications](https://i.imgur.com/4fSHEcc.png)
 
 Now "Current Eu4 Date" will display the ingame date when you go back to the game and continue playing, it will update accordingly.
 
-Now you can use this: 
+Now you can use this:
 
-![](https://i.imgur.com/NLs9gA9.png)
+![Enter your notification](https://i.imgur.com/NLs9gA9.png)
 
 to add notification that plays when that date is reached. Using the -/+ button, drawdown menu, or simply typing it in.
 
