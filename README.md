@@ -36,7 +36,7 @@ to add notification that plays when that date is reached. Using the -/+ button, 
 
 ## Build
 
-Requires: [CMake](https://cmake.org/download/) and a C++ Compiler (Tested: MSVC 14.29, Clang 12, GCC 10).
+Requires: [CMake](https://cmake.org/download/) and a C++17 compliant Compiler (Tested: MSVC 14.29, Clang 12, GCC 10).
 
 Open your favorite terminal/shell, navigate to where you want to the folder have the `Eu4_TimeNotifi folder, then one after the other write the following commands:
 
