@@ -38,7 +38,7 @@ to add notification that plays when that date is reached. Using the -/+ button, 
 
 Requires: [CMake](https://cmake.org/download/) and a C++17 compliant Compiler (Tested: MSVC 14.29, Clang 12, GCC 10).
 
-Open your favorite terminal/shell, navigate to where you want to the folder have the `Eu4_TimeNotifi folder, then one after the other write the following commands:
+Open your favorite terminal/shell, navigate to where you want to the folder have the `Eu4_TimeNotifi` folder, then one after the other write the following commands:
 
 ```bash
 $ git clone https://github.com/Togtja/Eu4_TimeNotifi
@@ -62,12 +62,12 @@ Used for the UI
 The OpenGL Loading Library I went with
 
 [stb](https://github.com/nothings/stb)
-Used to be able to load png/jpg images to OpenGL textures
+Used for loading png/jpg images to OpenGL textures
 
-### Cmake extracted (CMake fill fetch these from their repos)
+### Cmake extracted (CMake will fetch these from their repos)
 
 [OpenAL soft](https://github.com/kcat/openal-soft)
-Used to be  able to fetch your audio driver and play sounds
+Used for fetching your audio driver and play sounds
 
 [libsndfile](https://github.com/libsndfile/libsndfile)
 Used for reading wav file to load in to OpenAL-soft. I want to be able to support more audio formats than just `.wav`
@@ -80,9 +80,8 @@ Used for logging messages cleanly and faster than std::cout
 
 ### [OpenGL](https://www.opengl.org/) is not included
 
-However most system/graphics driver has at least a version of OpenGL
+However, most system/graphics driver has at least a version of OpenGL
 
 ## Todo/Missing features
 
-- [ ] Write this read me
 - [ ] Spend some time improving the UI
