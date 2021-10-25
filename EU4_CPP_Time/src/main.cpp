@@ -22,11 +22,8 @@
 #include "Constants.hpp"
 
 #include "Utility.hpp"
-#include <iostream>
 
 int main(int argc, char* argv[]) {
-    std::cout << "Hello world\n";
-
     spdlog::set_level(spdlog::level::debug);
 
     // Setup window
@@ -192,6 +189,7 @@ int main(int argc, char* argv[]) {
                 }
             }
 
+            // Load widgets
             current_date.correct_date();
             display_current_date(current_date);
 
@@ -204,8 +202,7 @@ int main(int argc, char* argv[]) {
             select_sound_player_widget(sound, sound_devices, current_device);
 
             save_notification_widget(notify_dates, current_loaded_file);
-
-            // Load widget
+            load_notification_widget(notify_dates, current_device);
 
             ImGui::End();
         } // End Widget

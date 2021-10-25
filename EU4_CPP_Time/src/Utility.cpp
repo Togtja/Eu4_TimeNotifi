@@ -238,7 +238,7 @@ void manage_notifications(std::vector<Eu4_Notification>& notify_dates,
             }
         }
         // Display the dates here
-        ImGui::Text(fmt::format("Notification for: {} ({})", eu4date.message, eu4date.date.get_date_as_string()).c_str());
+        ImGui::Text("%s", fmt::format("Notification for: {} ({})", eu4date.message, eu4date.date.get_date_as_string()).c_str());
         ImGui::SameLine();
         if (ImGui::Button("X", {15, 15})) {
             notify_dates.erase(std::remove(notify_dates.begin(), notify_dates.end(), eu4date), notify_dates.end());
@@ -254,7 +254,7 @@ void notify_popup(std::vector<std::string>& popup_msg) {
     }
     if (ImGui::BeginPopup("Notification Popup")) {
         for (auto&& msg : popup_msg) {
-            ImGui::Text(msg.c_str());
+            ImGui::Text("%s", msg.c_str());
         }
         if (ImGui::Button("Ok", {200, 20})) {
             ImGui::CloseCurrentPopup();
